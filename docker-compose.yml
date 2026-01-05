@@ -56,8 +56,8 @@ services:
       SPEECHMATICS_BASE_URL: ${SPEECHMATICS_BASE_URL:-https://asr.api.speechmatics.com}
       OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       
-      # ASR Provider
-      ASR_PROVIDER: ${ASR_PROVIDER:-speechmatics}
+      # ASR Provider (whisper or speechmatics)
+      ASR_PROVIDER: ${ASR_PROVIDER:-whisper}
       
       # JWT Secret
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
@@ -101,8 +101,8 @@ services:
       SPEECHMATICS_BASE_URL: ${SPEECHMATICS_BASE_URL:-https://asr.api.speechmatics.com}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       
-      # ASR Provider
-      ASR_PROVIDER: ${ASR_PROVIDER:-speechmatics}
+      # ASR Provider (whisper or speechmatics)
+      ASR_PROVIDER: ${ASR_PROVIDER:-whisper}
       
       # Environment
       ENVIRONMENT: production
