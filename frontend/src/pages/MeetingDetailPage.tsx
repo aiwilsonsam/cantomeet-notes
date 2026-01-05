@@ -46,7 +46,7 @@ export const MeetingDetailPage = () => {
     queryFn: () => meetingsApi.get(id!),
     enabled: !!id,
     staleTime: 0, // Always consider data stale to ensure fresh data on navigation
-    cacheTime: 0, // Don't cache to ensure we always fetch fresh data
+    gcTime: 0, // Don't cache to ensure we always fetch fresh data (formerly cacheTime in v4)
     refetchInterval: (query) => {
       // Poll for updates if meeting is still being summarized
       const meeting = query.state.data;

@@ -1,6 +1,9 @@
 // API Request/Response Types
 import type { CurrentUser } from './user';
 
+// Re-export types used in API responses
+export type { CurrentUser };
+
 export interface ApiError {
   message: string;
   code?: string;

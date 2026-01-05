@@ -1,6 +1,6 @@
 import apiClient from './client';
 import { Meeting, UpdateMeetingRequest } from '@/types';
-import { PaginatedResponse, UploadMeetingRequest, UploadMeetingResponse } from '@/types/api';
+import { UploadMeetingRequest, UploadMeetingResponse } from '@/types/api';
 import { ENABLE_MOCK_API } from '@/lib/constants';
 import { mockDataService } from './mockData';
 

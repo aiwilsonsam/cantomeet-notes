@@ -9,9 +9,7 @@ import {
   ArrowRight, 
   Check,
   PlayCircle,
-  Star,
-  TrendingUp,
-  Shield
+  Star
 } from 'lucide-react';
 
 export const LandingPage = () => {
