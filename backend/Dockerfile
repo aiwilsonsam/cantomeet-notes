@@ -37,16 +37,16 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
-COPY . .
+# Create non-root user first
+RUN useradd -m -u 1000 appuser
 
-# Create uploads directory
+# Copy application code and set ownership
+COPY --chown=appuser:appuser . .
+
+# Create uploads directory with correct ownership
 RUN mkdir -p /app/uploads/audio && \
+    chown -R appuser:appuser /app/uploads && \
     chmod -R 755 /app/uploads
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser
