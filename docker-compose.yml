@@ -124,8 +124,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # API will be proxied through nginx
-        VITE_API_BASE_URL: /api
+        # Direct access to backend (no nginx proxy for now)
+        # Use server IP:8200 for production, or /api if using nginx proxy
+        VITE_API_BASE_URL: http://167.253.159.233:8200/api
     container_name: cantomeet-frontend
     restart: unless-stopped
     ports:
