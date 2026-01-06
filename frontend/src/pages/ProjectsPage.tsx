@@ -166,7 +166,7 @@ export const ProjectsPage = () => {
 
   const handleProjectClick = (id: string) => {
     // TODO: Navigate to project detail page
-    console.log('Project clicked:', id);
+    // console.log('Project clicked:', id);
   };
 
   const handleCreateClick = (status: Project['status']) => {

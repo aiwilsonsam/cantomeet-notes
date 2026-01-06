@@ -42,17 +42,17 @@ export const TasksPage = () => {
     queryKey: ['tasks', activeWorkspace?.id],
     queryFn: async () => {
       if (!activeWorkspace) {
-        console.log('[TasksPage] No active workspace, returning empty array');
+        // console.log('[TasksPage] No active workspace, returning empty array');
         return Promise.resolve([]);
       }
-      console.log('[TasksPage] Fetching tasks for workspace:', activeWorkspace.id);
-      console.log('[TasksPage] ENABLE_MOCK_API:', ENABLE_MOCK_API);
+      // console.log('[TasksPage] Fetching tasks for workspace:', activeWorkspace.id);
+      // console.log('[TasksPage] ENABLE_MOCK_API:', ENABLE_MOCK_API);
       try {
         const result = await tasksApi.list(activeWorkspace.id);
-        console.log('[TasksPage] Tasks fetched:', result);
+        // console.log('[TasksPage] Tasks fetched:', result);
         return result;
       } catch (err) {
-        console.error('[TasksPage] Error fetching tasks:', err);
+        // console.error('[TasksPage] Error fetching tasks:', err);
         throw err;
       }
     },
@@ -72,7 +72,7 @@ export const TasksPage = () => {
   // Handle errors
   useEffect(() => {
     if (error) {
-      console.error('Failed to fetch tasks:', error);
+      // console.error('Failed to fetch tasks:', error);
       toast.error((error as any)?.message || 'Failed to load tasks');
     }
   }, [error]);
@@ -222,16 +222,6 @@ export const TasksPage = () => {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">任務中心 Task Center</h1>
             <p className="text-slate-500">Monitor processing jobs and finalize transcripts.</p>
-            {ENABLE_MOCK_API && (
-              <p className="text-xs text-yellow-600 mt-1">
-                ⚠️ Using mock data (ENABLE_MOCK_API={String(ENABLE_MOCK_API)}, env={String(import.meta.env.VITE_ENABLE_MOCK_API)})
-              </p>
-            )}
-            {!ENABLE_MOCK_API && (
-              <p className="text-xs text-green-600 mt-1">
-                ✅ Using real API (API_BASE_URL: {import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'})
-              </p>
-            )}
           </div>
           {tasks.length === 0 && (
             <button

@@ -7,9 +7,9 @@ export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
 export const ENABLE_MOCK_API = import.meta.env.VITE_ENABLE_MOCK_API === 'true';
 
 // Debug: Log the actual value
-console.log('[constants] VITE_ENABLE_MOCK_API env:', import.meta.env.VITE_ENABLE_MOCK_API);
-console.log('[constants] ENABLE_MOCK_API:', ENABLE_MOCK_API);
-console.log('[constants] API_BASE_URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api');
+// console.log('[constants] VITE_ENABLE_MOCK_API env:', import.meta.env.VITE_ENABLE_MOCK_API);
+// console.log('[constants] ENABLE_MOCK_API:', ENABLE_MOCK_API);
+// console.log('[constants] API_BASE_URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api');
 export const ENABLE_DEV_TOOLS = import.meta.env.VITE_ENABLE_DEV_TOOLS === 'true';
 
 // App Configuration
