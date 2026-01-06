@@ -164,7 +164,7 @@ export const ProjectsPage = () => {
     }));
   };
 
-  const handleProjectClick = (id: string) => {
+  const handleProjectClick = (_id: string) => {
     // TODO: Navigate to project detail page
     // console.log('Project clicked:', id);
   };

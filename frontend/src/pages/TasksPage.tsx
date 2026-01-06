@@ -19,7 +19,6 @@ import { tasksApi } from '@/services/api/tasks';
 import { meetingsApi } from '@/services/api/meetings';
 import { ProcessingTask } from '@/types';
 import toast from 'react-hot-toast';
-import { ENABLE_MOCK_API } from '@/lib/constants';
 
 // Mock templates - TODO: Move to API
 const MOCK_TEMPLATES = [
