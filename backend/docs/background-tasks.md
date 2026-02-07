@@ -71,18 +71,21 @@ In `.env`:
 REDIS_URL=redis://localhost:6379/0
 ```
 
-### 3. Start RQ Worker
+### 3. Start RQ Worker(s)
 
 ```bash
-# Option 1: Using script
+# Single worker
 ./scripts/start_worker.sh
+# macOS: ./scripts/start_worker_safe.sh
 
-# Option 2: Using rq command
+# Multiple workers (parallel processing for multi-user, multi-workspace)
+./scripts/start_workers_safe.sh 3
+
+# Or using rq command (one worker per terminal)
 rq worker --with-scheduler default high_priority
-
-# Option 3: Using Python module
-python -m app.tasks.worker
 ```
+
+**Concurrency**: Run multiple workers to process jobs in parallel. Each worker handles one job at a time; N workers enable N concurrent transcription/summarization tasks. Recommended for production with multiple users and workspaces.
 
 ## Task Configuration
 
@@ -117,6 +120,15 @@ redis-cli
 - Error details stored in `meeting.status_reason`
 - Failed job info kept in Redis for 24 hours
 - Can be retried manually or automatically (future enhancement)
+
+## Concurrency
+
+The design supports parallel processing:
+
+- **Multiple workers**: Run `./scripts/start_workers_safe.sh 3` or scale with `docker compose up -d --scale worker=3`
+- **Database**: Connection pool configured for concurrent workers (`pool_pre_ping`, `pool_size`, `max_overflow`)
+- **Tasks**: Each job is independent (per meeting); no shared mutable state between jobs
+- **Bottlenecks**: External APIs (Whisper, GPT-4o) may have rate limits under heavy concurrency
 
 ## Future Enhancements
 

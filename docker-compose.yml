@@ -82,14 +82,17 @@ services:
       start_period: 30s
 
   # RQ Worker (Background tasks)
+  # Scale for concurrency: docker compose up -d --scale worker=3
+  # Each worker processes one job at a time; multiple workers enable parallel transcription/summarization
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: cantomeet-worker
     restart: unless-stopped
     command: rq worker --with-scheduler default high_priority
     environment:
+      # Required for RQ to import app.tasks.transcription (job functions)
+      PYTHONPATH: /app
       # Database (same as backend)
       DATABASE_URL: postgresql://${POSTGRES_USER:-cantomeet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cantomeet_notes}
       
