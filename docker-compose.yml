@@ -42,8 +42,7 @@ services:
     container_name: cantomeet-backend
     restart: unless-stopped
     ports:
-      - "8200:8000"  # Expose backend to public (for testing without global nginx)
-      # Use "127.0.0.1:8200:8000" for local access only
+      - "127.0.0.1:8200:8000"  # 仅本机访问，对外通过 Nginx (notes.companionai.life/api)
     environment:
       # Required for alembic and app imports
       PYTHONPATH: /app
@@ -81,6 +80,7 @@ services:
         condition: service_healthy
     networks:
       - cantomeet-network
+      - companionai-public
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 20s
@@ -130,16 +130,15 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Direct access to backend (no nginx proxy for now)
-        # Use server IP:8200 for production, or /api if using nginx proxy
-        VITE_API_BASE_URL: http://167.253.159.233:8200/api
+        # 使用相对路径 /api，由 Nginx 统一代理到 notes.companionai.life/api
+        VITE_API_BASE_URL: /api
     container_name: cantomeet-frontend
     restart: unless-stopped
     ports:
-      - "3004:80"  # Expose frontend to public (for testing without global nginx)
-      # Use "127.0.0.1:3004:80" for local access only
+      - "127.0.0.1:3004:80"  # 仅本机访问，对外通过 Nginx (notes.companionai.life)
     networks:
       - cantomeet-network
+      - companionai-public
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
@@ -161,4 +160,7 @@ volumes:
 networks:
   cantomeet-network:
     driver: bridge
+  # 接入全局 Nginx 共享网络（需先启动 aura-companion 以创建此网络）
+  companionai-public:
+    external: true
 
