@@ -61,6 +61,11 @@ services:
       # ASR Provider (whisper or speechmatics)
       ASR_PROVIDER: ${ASR_PROVIDER:-whisper}
       
+      # Summarization: "openai" (direct OpenAI) or "dify" (Dify Chatflow)
+      SUMMARIZATION_PROVIDER: ${SUMMARIZATION_PROVIDER:-openai}
+      DIFY_API_BASE_URL: ${DIFY_API_BASE_URL:-}
+      DIFY_API_KEY: ${DIFY_API_KEY:-}
+      
       # JWT Secret
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
@@ -108,6 +113,11 @@ services:
       
       # ASR Provider (whisper or speechmatics)
       ASR_PROVIDER: ${ASR_PROVIDER:-whisper}
+      
+      # Summarization: "openai" or "dify" (Dify Chatflow)
+      SUMMARIZATION_PROVIDER: ${SUMMARIZATION_PROVIDER:-openai}
+      DIFY_API_BASE_URL: ${DIFY_API_BASE_URL:-}
+      DIFY_API_KEY: ${DIFY_API_KEY:-}
       
       # Environment
       ENVIRONMENT: production
