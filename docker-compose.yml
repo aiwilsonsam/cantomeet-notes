@@ -88,38 +88,27 @@ services:
       retries: 5
       start_period: 30s
 
-  # RQ Worker (Background tasks)
-  # Scale for concurrency: docker compose up -d --scale worker=3
-  # Each worker processes one job at a time; multiple workers enable parallel transcription/summarization
+  # RQ Worker - 3 instances for parallel transcription/summarization
+  # If replicas not applied, run: docker compose up -d --scale worker=3
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    healthcheck:
+      disable: true  # Worker runs RQ, not HTTP; backend image's healthcheck expects port 8000
     command: rq worker --with-scheduler default high_priority
     environment:
-      # Required for RQ to import app.tasks.transcription (job functions)
       PYTHONPATH: /app
-      # Database (same as backend)
       DATABASE_URL: postgresql://${POSTGRES_USER:-cantomeet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cantomeet_notes}
-      
-      # Redis
       REDIS_URL: redis://redis:6379/0
-      
-      # API Keys
       SPEECHMATICS_API_KEY: ${SPEECHMATICS_API_KEY}
       SPEECHMATICS_BASE_URL: ${SPEECHMATICS_BASE_URL:-https://asr.api.speechmatics.com}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      
-      # ASR Provider (whisper or speechmatics)
       ASR_PROVIDER: ${ASR_PROVIDER:-whisper}
-      
-      # Summarization: "openai" or "dify" (Dify Chatflow)
       SUMMARIZATION_PROVIDER: ${SUMMARIZATION_PROVIDER:-openai}
       DIFY_API_BASE_URL: ${DIFY_API_BASE_URL:-}
       DIFY_API_KEY: ${DIFY_API_KEY:-}
-      
-      # Environment
       ENVIRONMENT: production
     volumes:
       - ./backend/uploads:/app/uploads
@@ -132,6 +121,8 @@ services:
         condition: service_healthy
     networks:
       - cantomeet-network
+    deploy:
+      replicas: 3
 
   # Frontend (svc-web-notes)
   frontend:
@@ -150,7 +141,7 @@ services:
     networks:
       - cantomeet-network
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/index.html >/dev/null || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
       timeout: 5s
       retries: 5
