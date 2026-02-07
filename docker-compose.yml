@@ -45,6 +45,8 @@ services:
       - "8200:8000"  # Expose backend to public (for testing without global nginx)
       # Use "127.0.0.1:8200:8000" for local access only
     environment:
+      # Required for alembic and app imports
+      PYTHONPATH: /app
       # Database
       DATABASE_URL: postgresql://${POSTGRES_USER:-cantomeet}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cantomeet_notes}
       
