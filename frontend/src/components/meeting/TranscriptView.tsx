@@ -28,7 +28,7 @@ export const TranscriptView = ({ segments, participants, highlightedId, transcri
 
   const getSpeaker = (id: string) => participants.find((p) => p.id === id);
 
-  const getSpeakerName = (speakerId: string, speaker: Speaker | undefined) => {
+  const getSpeakerName = (_speakerId: string, speaker: Speaker | undefined) => {
     if (speaker?.name && speaker.name !== 'Unknown' && !/^Speaker\s+(?:\d+|\w+)$/.test(speaker.name)) {
       return speaker.name;
     }
