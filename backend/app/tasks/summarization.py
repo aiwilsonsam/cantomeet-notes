@@ -15,9 +15,11 @@ from rq import get_current_job
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
+from app.core.config import settings
 from app.models.action_item import ActionItem, ActionPriority, ActionStatus
 from app.models.meeting import Meeting, MeetingStatus
 from app.models.processing_task import ProcessingTask, TaskStatus
+from app.models.prompt_template import PromptTemplate
 from app.models.summary import Summary
 from app.models.transcript import Transcript
 from app.services.summarization_service import SummarizationError, get_summarization_service
@@ -98,20 +100,49 @@ def summarize_meeting_task(meeting_id: str, task_id: str | None = None) -> dict[
         meeting.status = MeetingStatus.SUMMARIZING
         db.commit()
 
+        # Determine summarization model: workspace default or config default
+        from app.models.workspace import Workspace
+
+        workspace = db.query(Workspace).filter(Workspace.id == meeting.workspace_id).first()
+        summarization_model = (
+            (workspace.summarization_model if workspace else None)
+            or settings.summarization_default_model
+        )
+
         if processing_task:
             processing_task.progress = 10
             transcript_length = len(transcript.content)
-            _update_task_log(db, processing_task, f"Calling LLM (gpt-4o-mini) to generate summary from {transcript_length} chars transcript...")
+            provider = settings.summarization_provider
+            if provider == "dify":
+                task_log_msg = f"Calling Dify to generate meeting minutes from {transcript_length} chars transcript..."
+            else:
+                task_log_msg = f"Calling LLM ({summarization_model}) to generate summary from {transcript_length} chars transcript..."
+            _update_task_log(db, processing_task, task_log_msg)
 
-        # Generate summary using LLM
-        logger.info("🌐 Calling LLM summarization service...")
+        provider = settings.summarization_provider
+        logger.info(f"🌐 Calling {'Dify' if provider == 'dify' else 'LLM'} summarization service...")
         summarization_service = get_summarization_service()
+
+        # Check if PROMPT template is used (template starts with "prompt:")
+        prompt_template_content = None
+        template_for_sections = meeting.template
+        if meeting.template and meeting.template.startswith("prompt:"):
+            template_id = meeting.template[7:]  # len("prompt:")
+            prompt_tpl = db.query(PromptTemplate).filter(PromptTemplate.id == template_id).first()
+            if prompt_tpl:
+                prompt_template_content = prompt_tpl.content
+                template_for_sections = None
+                logger.info(f"   Using PROMPT template: {prompt_tpl.name}")
+            else:
+                logger.warning(f"   Prompt template {template_id} not found, falling back to default")
 
         summary_data = summarization_service.generate_summary(
             transcript_text=transcript.content,
             meeting_title=meeting.title,
-            template=meeting.template,
+            template=template_for_sections,
             language=meeting.language_code,
+            prompt_template_content=prompt_template_content,
+            model=summarization_model,
         )
 
         if processing_task:
@@ -129,7 +160,7 @@ def summarize_meeting_task(meeting_id: str, task_id: str | None = None) -> dict[
             summary.agenda_items = summary_data.get("agenda_items", [])
             summary.decisions = summary_data.get("decisions", [])
             summary.highlights = summary_data.get("highlights", [])
-            summary.generated_by_model = summarization_service.model
+            summary.generated_by_model = summarization_model
         else:
             # Create new summary
             summary = Summary(
@@ -139,7 +170,7 @@ def summarize_meeting_task(meeting_id: str, task_id: str | None = None) -> dict[
                 agenda_items=summary_data.get("agenda_items", []),
                 decisions=summary_data.get("decisions", []),
                 highlights=summary_data.get("highlights", []),
-                generated_by_model=summarization_service.model,
+                generated_by_model=summarization_model,
             )
             db.add(summary)
 

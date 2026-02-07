@@ -15,10 +15,13 @@ from app.models.workspace import (
     WorkspacePlan,
     WorkspaceRole,
 )
+from app.core.summarization_models import SUMMARIZATION_AVAILABLE_MODELS
 from app.schemas.workspace import (
     CreateWorkspaceRequest,
     JoinWorkspaceRequest,
     WorkspaceResponse,
+    WorkspaceSettingsResponse,
+    WorkspaceSettingsUpdate,
 )
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
@@ -223,6 +226,70 @@ def join_workspace(
         logo=workspace.logo or workspace.name[:2].upper(),
         plan=workspace.plan,
         role=WorkspaceRole.MEMBER,
+    )
+
+
+@router.get("/{workspace_id}/settings", response_model=WorkspaceSettingsResponse)
+def get_workspace_settings(
+    workspace_id: str,
+    current_user: CurrentUser,
+    db: Session = Depends(get_session),
+) -> WorkspaceSettingsResponse:
+    """Get workspace AI settings (summarization model, etc.)."""
+    membership = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace not found or access denied",
+        )
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    return WorkspaceSettingsResponse(
+        summarization_model=workspace.summarization_model,
+        available_models=SUMMARIZATION_AVAILABLE_MODELS,
+    )
+
+
+@router.patch("/{workspace_id}/settings", response_model=WorkspaceSettingsResponse)
+def update_workspace_settings(
+    workspace_id: str,
+    body: WorkspaceSettingsUpdate,
+    current_user: CurrentUser,
+    db: Session = Depends(get_session),
+) -> WorkspaceSettingsResponse:
+    """Update workspace AI settings (e.g., default summarization model)."""
+    membership = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == current_user.id,
+        )
+        .first()
+    )
+    # Allow workspace admins (role=ADMIN); auth register sets role but not access_level
+    if not membership or membership.role != WorkspaceRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Workspace not found or admin access required",
+        )
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    if body.summarization_model is not None:
+        workspace.summarization_model = body.summarization_model if body.summarization_model else None
+    db.commit()
+    db.refresh(workspace)
+    return WorkspaceSettingsResponse(
+        summarization_model=workspace.summarization_model,
+        available_models=SUMMARIZATION_AVAILABLE_MODELS,
     )
 
 

@@ -54,6 +54,9 @@ class Workspace(TimestampMixin, Base):
         nullable=False,
     )
     invite_code: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True, index=True)
+    summarization_model: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )  # Default LLM for meeting summaries, e.g. gpt-4o
 
     # Relationships
     members: Mapped[list["WorkspaceMember"]] = relationship(
@@ -62,6 +65,16 @@ class Workspace(TimestampMixin, Base):
         cascade="all, delete-orphan",
     )
     meetings: Mapped[list["Meeting"]] = relationship("Meeting", back_populates="workspace")
+    prompt_templates: Mapped[list["PromptTemplate"]] = relationship(
+        "PromptTemplate",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
+    workspace_tags: Mapped[list["WorkspaceTag"]] = relationship(
+        "WorkspaceTag",
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Workspace id={self.id} name={self.name}>"

@@ -25,6 +25,7 @@ dependencies = [
     "email-validator>=2.0.0,<3.0.0",
     "openai>=1.0.0,<2.0.0",  # For Whisper API support
     "certifi>=2023.0.0",  # SSL certificates for macOS compatibility
+    "pydub>=0.25.0",  # Audio chunking for Whisper 25MB limit
 ]
 
 [project.optional-dependencies]

@@ -76,10 +76,10 @@ services:
       - cantomeet-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # RQ Worker (Background tasks)
   worker:
@@ -117,12 +117,6 @@ services:
         condition: service_healthy
     networks:
       - cantomeet-network
-    healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'rq worker' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # Frontend (svc-web-notes)
   frontend:
@@ -141,11 +135,11 @@ services:
     networks:
       - cantomeet-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost/index.html >/dev/null || exit 1"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Note: Nginx service removed - using global nginx (aura-companion-nginx)
   # The global nginx will proxy to:

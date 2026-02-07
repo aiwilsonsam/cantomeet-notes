@@ -16,6 +16,8 @@ class ProcessingTaskListResponse(BaseModel):
     progress: int  # 0-100
     logs: list[str]
     startTime: str  # ISO datetime string
+    meetingId: Optional[str] = None
+    template: Optional[str] = None
 
 
 class ProcessingTaskDetailResponse(BaseModel):

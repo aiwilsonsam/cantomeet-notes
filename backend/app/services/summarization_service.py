@@ -6,7 +6,8 @@ Cantonese-English mixed meeting transcripts.
 
 import json
 import logging
-from typing import Any
+from typing import Any, Union
+
 
 from app.core.config import settings
 
@@ -52,9 +53,9 @@ class SummarizationService:
                 api_key=settings.openai_api_key,
                 http_client=http_client,
             )
-            self.model = "gpt-4o-mini"  # Cost-effective model, can be changed to gpt-4o for better quality
+            self.default_model = settings.summarization_default_model
             logger.info("✅ Summarization service initialized")
-            logger.info(f"   Using model: {self.model}")
+            logger.info(f"   Default model: {self.default_model}")
         except ImportError as e:
             missing_package = "openai" if "openai" in str(e) else "certifi"
             raise SummarizationError(
@@ -67,55 +68,124 @@ class SummarizationService:
         meeting_title: str | None = None,
         template: str | None = None,
         language: str = "yue",
+        prompt_template_content: str | None = None,
+        model: str | None = None,
     ) -> dict[str, Any]:
         """
-        Generate structured meeting summary from transcript.
+        Generate meeting summary from transcript.
+
+        When prompt_template_content is provided (PROMPT template mode):
+        - Uses the template with {{content}} replaced by transcript
+        - LLM output is free-form text, stored in detailed_minutes
+        - Returns overview="", detailed_minutes=<raw output>, decisions=[], action_items=[]
+
+        Otherwise (SECTIONS template mode):
+        - Uses structured JSON output with overview, detailed_minutes, decisions, action_items
 
         Args:
-            transcript_text: Full transcript text (may contain Cantonese-English mixed content)
-            meeting_title: Meeting title (optional, for context)
-            template: Template name (optional, for custom formatting)
-            language: Language code (default: "yue" for Cantonese)
+            transcript_text: Full transcript text
+            meeting_title: Meeting title (optional)
+            template: Template name for SECTIONS mode (default, Product Review, Sales)
+            language: Language code (default "yue")
+            prompt_template_content: Prompt template content with {{content}} for PROMPT mode
+            model: Override LLM model (e.g. gpt-4o, gpt-4o-mini); uses workspace default or config default if None
 
         Returns:
-            Structured summary dictionary with:
-            - overview: Executive summary text
-            - agenda_items: List of agenda items
-            - decisions: List of key decisions
-            - highlights: List of highlights
-            - action_items: List of action items (extracted from decisions/discussions)
-
-        Raises:
-            SummarizationError: If summary generation fails
+            Summary dict with overview, detailed_minutes, agenda_items, decisions, highlights, action_items
         """
         logger.info(f"📝 Generating summary for meeting: {meeting_title or 'Untitled'}")
         logger.info(f"   Transcript length: {len(transcript_text)} chars")
-        logger.info(f"   Template: {template or 'default'}")
 
-        # Build system prompt
-        system_prompt = self._build_system_prompt(template)
+        effective_model = model or self.default_model
+        logger.info(f"   Model: {effective_model}")
 
-        # Build user prompt with transcript
-        user_prompt = self._build_user_prompt(transcript_text, meeting_title, language)
+        if prompt_template_content:
+            return self._generate_with_prompt_template(
+                transcript_text, prompt_template_content, effective_model
+            )
+        return self._generate_with_sections_template(
+            transcript_text, meeting_title, template, language, effective_model
+        )
+
+    def _generate_with_prompt_template(
+        self, transcript_text: str, prompt_template_content: str, model: str
+    ) -> dict[str, Any]:
+        """Generate free-form summary using user prompt template."""
+        logger.info("   Mode: PROMPT template (free-form output)")
+
+        user_prompt = prompt_template_content.replace("{{content}}", transcript_text)
+
+        max_transcript_length = 100000
+        if len(transcript_text) > max_transcript_length:
+            logger.warning(
+                f"Transcript is very long ({len(transcript_text)} chars). Truncating to {max_transcript_length} chars."
+            )
+            truncated = transcript_text[:max_transcript_length] + "\n\n[... transcript truncated ...]"
+            user_prompt = prompt_template_content.replace("{{content}}", truncated)
+
+        system_prompt = "你是一个会议纪要助手。请根据用户的指示处理转录内容，并按要求生成输出。输出格式完全由用户指示决定。"
 
         try:
-            # Call OpenAI API
             response = self.client.chat.completions.create(
-                model=self.model,
+                model=model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.7,
-                response_format={"type": "json_object"},  # Force JSON response
+                # No response_format - free-form text output
             )
 
-            # Parse response
             content = response.choices[0].message.content
             if not content:
                 raise SummarizationError("Empty response from LLM")
 
-            # Parse JSON response
+            logger.info("✅ PROMPT template summary generated successfully")
+            logger.info(f"   Output length: {len(content)} chars")
+
+            return {
+                "overview": "",
+                "detailed_minutes": content,
+                "agenda_items": [],
+                "decisions": [],
+                "highlights": [],
+                "action_items": [],
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"❌ PROMPT template summarization error: {error_msg}")
+            raise SummarizationError(f"Failed to generate summary: {error_msg}") from e
+
+    def _generate_with_sections_template(
+        self,
+        transcript_text: str,
+        meeting_title: str | None,
+        template: str | None,
+        language: str,
+        model: str,
+    ) -> dict[str, Any]:
+        """Generate structured JSON summary using SECTIONS template."""
+        logger.info(f"   Mode: SECTIONS template ({template or 'default'})")
+
+        system_prompt = self._build_system_prompt(template)
+        user_prompt = self._build_user_prompt(transcript_text, meeting_title, language)
+
+        try:
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.7,
+                response_format={"type": "json_object"},
+            )
+
+            content = response.choices[0].message.content
+            if not content:
+                raise SummarizationError("Empty response from LLM")
+
             try:
                 summary_data = json.loads(content)
             except json.JSONDecodeError as e:
@@ -123,7 +193,7 @@ class SummarizationService:
                 logger.error(f"Response content: {content[:500]}")
                 raise SummarizationError(f"Invalid JSON response from LLM: {e}") from e
 
-            logger.info("✅ Summary generated successfully")
+            logger.info("✅ SECTIONS summary generated successfully")
             logger.info(f"   Overview length: {len(summary_data.get('overview', ''))} chars")
             detailed_minutes_len = len(summary_data.get('detailed_minutes', '') or '')
             logger.info(f"   Detailed minutes length: {detailed_minutes_len} chars")
@@ -132,6 +202,8 @@ class SummarizationService:
 
             return summary_data
 
+        except SummarizationError:
+            raise
         except Exception as e:
             error_msg = str(e)
             logger.error(f"❌ Summarization error: {error_msg}")
@@ -153,12 +225,12 @@ You analyze meeting transcripts that contain mixed Cantonese (粤语) and Englis
 Your task is to generate TWO types of summaries:
 
 1. **Overview (overview)**: A concise executive summary (2-3 paragraphs) for quick reference
-2. **Detailed Minutes (detailed_minutes)**: A comprehensive, structured meeting minutes (会议纪要) that can be directly reported to management or project teams
+2. **Detailed Minutes (detailed_minutes)**: A comprehensive, structured meeting minutes (会议纪要) in Markdown format that can be directly reported to management. Output style should match ChatGPT's meeting minutes: clear sections, proper spacing, tables for action items where appropriate.
 
 Generate a structured JSON summary with the following format:
 {
   "overview": "A concise executive summary (2-3 paragraphs) of what the meeting was about, key topics discussed, and main outcomes. Use the same language mix as the transcript (Cantonese-English). Keep it brief and focused.",
-  "detailed_minutes": "A compact, professional meeting minutes in Markdown format. Use a concise structure similar to ChatGPT's output style. IMPORTANT: NO blank lines between sections - content should flow directly:\n\n# 会议纪要（Meeting Minutes）\n**会议主题：** [Meeting Topic]\n**会议日期：** [Date or '不详（根据对话推断为...）']\n**与会人员：**\n- [Participant 1]\n- [Participant 2]\n# 1. 会议目标（Objectives）\n1. [Objective 1 - concise, one line]\n2. [Objective 2 - concise, one line]\n# 2. [Main Discussion Topic 1]\n### 2.1 [Sub-topic]\n- [Key point 1 - concise bullet point]\n- [Key point 2 - concise bullet point]\n### 2.2 [Sub-topic]\n- [Key point - concise bullet point]\n# 3. [Main Discussion Topic 2]\n[Continue with structured sections - keep content concise and professional]\n# 4. 双方行动项（Action Items）\n### [Party 1] 需提供：\n1. [Action item 1 - concise]\n2. [Action item 2 - concise]\n### [Party 2] 将会：\n1. [Action item 1 - concise]\n2. [Action item 2 - concise]\n# 5. 后续计划（Next Steps）\n1. [Next step 1 - concise]\n2. [Next step 2 - concise]\n# 6. 会议结论（Summary）\n[Key conclusions - concise paragraph]\n\n**CRITICAL FORMATTING RULES:**\n- Use compact format: NO horizontal rules (------) between sections, **ABSOLUTELY NO blank lines** (\\n\\n) anywhere in the output\n- **DO NOT use ** (bold) in headers** - headers with # already indicate emphasis, so avoid # **Title** format, use # Title instead\n- Use ** (bold) only in regular text content, not in headers\n- **ZERO blank lines**: Do not include any empty lines. Sections should flow directly: \"# Section\\nContent\\n# Next Section\" (no \\n\\n between)\n- Keep each bullet point concise (one line when possible)\n- Remove redundant words and filler phrases\n- Use professional, direct language\n- Structure similar to ChatGPT's compact meeting minutes style\n- Only include essential information, remove verbose explanations\n- Format example: \"# Title\\nContent\\n# Next Title\\nMore content\" (NO blank lines between)\n\n**CRITICAL**: You MUST always generate detailed_minutes for business meetings. Only set detailed_minutes to null if the transcript is clearly not a meeting (e.g., a very short casual conversation with no business content). For any meeting with discussion topics, decisions, or action items, you MUST provide detailed_minutes in the compact Markdown format above.",
+  "detailed_minutes": "Professional meeting minutes in Markdown format. Follow ChatGPT-style structure:\n\n📝会议纪要：[Meeting Title]\n\n**时间**： infer from context or write \"未提供\" (NEVER use [时间] or [日期] placeholders)\n**地点**： infer or \"未提供\"\n**与会人员**： list names from transcript\n**会议主题**： brief theme\n\n# 1. [Topic 1 Title]\n\n- Key point with specific details (preserve technical terms: HKMA, HSM, KYT, etc.)\n- Next point\n\n# 2. [Topic 2 Title]\n\n...\n\n# 行动项与后续计划\n\n| 行动项 | 负责人 | 备注 |\n| --- | --- | --- |\n| [task] | [owner] | [notes] |\n\n**CRITICAL FORMATTING RULES:**\n- NEVER use placeholder text like [日期], [地点], [时间]. Use \"未提供\" or \"待定\" if unknown.\n- Preserve all technical terms, company names, numbers (e.g. HKMA, HSM, Elliptic, 5台/10台).\n- Allow blank lines between major sections for readability (same as ChatGPT).\n- Action items: use Markdown table format (| 行动项 | 负责人 | 备注 |) when there are multiple items.\n- Use ** (bold) for emphasis in content, not in # headers.\n- Include emoji like 📝 if it fits the style.\n- Be detailed and professional - do not over-compress. Capture key decisions, numbers, and next steps.",
   "agenda_items": [
     {
       "id": "agenda_1",
@@ -193,54 +265,21 @@ Generate a structured JSON summary with the following format:
 }
 
 IMPORTANT GUIDELINES:
-1. **Compact & Professional Format**: Generate meeting minutes in a compact, professional style similar to ChatGPT's output:
-   - Use concise, direct language - remove filler words and redundant phrases
-   - Keep bullet points to one line when possible
-   - NO horizontal rules (------) between sections - use only section headings
-   - **ZERO blank lines** - Do not include any empty lines (\\n\\n) in the output. Sections should flow directly one after another
-   - Clear sections with numbered headings (e.g., "1. 会议目标 (Objectives)", "2. 对方当前状况与规划 (Partner Updates)")
-   - Use both Chinese and English headings where appropriate
-   - Structure with subsections (e.g., "2.1 Stablecoin 与 Smart Contract 状态")
-   - Each section should be compact and information-dense
-   - Format: "# Section Title\\nContent\\n# Next Section" (NO blank lines between sections)
+1. **ChatGPT-Style Format**: Match ChatGPT's meeting minutes output:
+   - Clear numbered sections with # 1. # 2. etc.
+   - Blank lines between major sections for readability
+   - Action items in Markdown table: | 行动项 | 负责人 | 备注 |
+   - Preserve technical terms (HKMA, HSM, KYT, Elliptic, Chainalysis, etc.)
 
-2. **Language**: Preserve the language mix (Cantonese-English) in your output. If the transcript uses mixed languages, your summary should too.
+2. **Placeholders**: NEVER output [日期], [地点], [时间]. Use "未提供" or "待定" if not in transcript.
 
-3. **Content Structure**: The detailed_minutes should include:
-   - Meeting topic/theme (会议主题) - concise
-   - Meeting date (会议日期) - infer from context if not explicitly stated
-   - Attendees (与会人员) - extract participant names from transcript
-   - Meeting objectives (会议目标) - numbered list, each objective in one concise line
-   - Key discussion points organized by topic or participant - use bullet points, keep concise
-   - Current status and planning information - direct and factual
-   - Technical details, decisions, and next steps - remove verbose explanations
+3. **Content**: Include meeting topic, date, attendees, discussion topics with details, technical decisions, action items table.
 
-4. **Compact Writing Style**:
-   - Remove redundant words: "discuss about" → "discuss", "in order to" → "to"
-   - Use active voice: "We will complete" instead of "It will be completed by us"
-   - Combine related points into single bullet points when possible
-   - Remove filler phrases: "as we mentioned", "you know", "basically", etc.
-   - Keep sentences short and direct
+4. **Language**: Preserve Cantonese-English mix from transcript.
 
-5. **Decisions**: Extract clear, specific decisions made during the meeting. Include who made the decision and what was decided. Format in one concise line when possible.
+5. **Accuracy**: Be precise. Preserve specific numbers, company names, and decisions.
 
-6. **Action Items**: Extract actionable tasks with:
-   - Clear, concise description (one line)
-   - Owner (extract name from transcript if mentioned, otherwise use "TBD")
-   - Due date (extract from transcript if mentioned, otherwise null)
-   - Priority (infer from context: urgent = high, normal = medium, nice-to-have = low)
-
-7. **Related Segment IDs**: Try to match action items and decisions to transcript segments. Use "seg_0", "seg_1", etc. format.
-
-8. **Accuracy**: Be precise and factual. Only include information explicitly mentioned in the transcript.
-
-9. **Hong Kong Context**: Be aware of Hong Kong business culture, common terms, and code-switching patterns.
-
-10. **Refinement**: Aggressively refine verbose spoken content into concise, professional written format:
-    - Remove repetition and redundant explanations
-    - Combine similar points
-    - Use professional terminology instead of casual expressions
-    - Keep all key information but in the most compact form possible
+6. **Action Items** (in JSON): Extract owner, dueDate if mentioned. For detailed_minutes, use table format.
 """
 
         # Template-specific customizations (can be extended)
@@ -285,19 +324,14 @@ ADDITIONAL GUIDELINES FOR SALES TEMPLATE:
         prompt_parts.append(f"Language: {language} (Cantonese with English code-switching)")
 
         prompt_parts.append("请根据以下会议转录内容，生成两种格式的摘要：")
-        prompt_parts.append("1. **overview**: 简短的执行摘要（2-3段），用于快速了解会议内容")
-        prompt_parts.append("2. **detailed_minutes**: 根据会议内容，生成一份会议纪要，包括会议主题、日期、与会人员、会议目标、讨论要点、行动项、后续计划、会议结论等")
-        prompt_parts.append("")
-        prompt_parts.append("要求：")
-        prompt_parts.append("- **紧凑格式**：参考 ChatGPT 的会议纪要风格，使用紧凑、专业的格式")
-        prompt_parts.append("- **去除冗余**：对冗长口语内容进行提炼与结构化，去除填充词、重复内容，保持关键信息完整但格式紧凑")
-        prompt_parts.append("- **简洁表达**：每个要点尽量一行，使用简洁直接的语言，去除不必要的解释和装饰性文字")
-        prompt_parts.append("- **格式要求**：不使用水平分隔线（------），**完全不要使用空行**（不要有任何 \\n\\n），各章节直接连接，格式紧凑")
-        prompt_parts.append("- **空行处理**：输出中不要包含任何空行，章节之间、列表之间都不要有空行，让内容紧凑连续")
-        prompt_parts.append("- **重要**：必须生成 detailed_minutes，除非转录内容明显不是会议（如非常简短的闲聊）")
-        prompt_parts.append("- detailed_minutes 应包含：会议主题、日期、与会人员、会议目标、讨论要点、行动项、后续计划、会议结论等")
-        prompt_parts.append("- 保持原文的语言混合风格（中文简体-粤语-英语）")
-        prompt_parts.append("- 按照系统提示词中的格式要求，生成结构化的 JSON 输出，确保 detailed_minutes 字段不为 null")
+        prompt_parts.append("1. **overview**: 简短的执行摘要（2-3段）")
+        prompt_parts.append("2. **detailed_minutes**: 生成一份专业会议纪要，风格参考 ChatGPT 输出：")
+        prompt_parts.append("   - 按主题分章节，章节之间可留空行便于阅读")
+        prompt_parts.append("   - 若无日期/地点则写「未提供」或「待定」，切勿使用 [日期] [地点] 等占位符")
+        prompt_parts.append("   - 保留所有技术术语、公司名称、具体数字")
+        prompt_parts.append("   - 行动项使用 Markdown 表格：| 行动项 | 负责人 | 备注 |")
+        prompt_parts.append("- 必须生成 detailed_minutes（除非转录明显不是会议）")
+        prompt_parts.append("- 按系统提示词格式输出 JSON")
 
         # Truncate transcript if too long (to avoid token limits)
         # GPT-4o-mini has ~128k context, but we'll be conservative
@@ -319,14 +353,25 @@ ADDITIONAL GUIDELINES FOR SALES TEMPLATE:
         return "\n".join(prompt_parts)
 
 
-# Singleton instance
-_summarization_service: SummarizationService | None = None
+# Singleton instances (one per provider)
+_openai_summarization_service: SummarizationService | None = None
+_dify_summarization_service: "DifySummarizationService | None" = None
 
 
-def get_summarization_service() -> SummarizationService:
-    """Get or create summarization service instance."""
-    global _summarization_service
-    if _summarization_service is None:
-        _summarization_service = SummarizationService()
-    return _summarization_service
+def get_summarization_service() -> Union[SummarizationService, "DifySummarizationService"]:
+    """Get summarization service based on SUMMARIZATION_PROVIDER setting."""
+    from app.core.config import settings
+
+    if settings.summarization_provider == "dify":
+        global _dify_summarization_service
+        if _dify_summarization_service is None:
+            from app.services.dify_summarization_service import DifySummarizationService
+
+            _dify_summarization_service = DifySummarizationService()
+        return _dify_summarization_service
+
+    global _openai_summarization_service
+    if _openai_summarization_service is None:
+        _openai_summarization_service = SummarizationService()
+    return _openai_summarization_service
 

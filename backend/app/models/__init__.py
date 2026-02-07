@@ -38,6 +38,8 @@ from .workspace import (  # noqa: E402
     WorkspacePlan,
     WorkspaceRole,
 )
+from .prompt_template import PromptTemplate  # noqa: E402
+from .workspace_tag import WorkspaceTag  # noqa: E402
 
 __all__ += [
     "User",
@@ -55,6 +57,8 @@ __all__ += [
     "WorkspacePlan",
     "WorkspaceRole",
     "WorkspaceAccessLevel",
+    "PromptTemplate",
+    "WorkspaceTag",
 ]
 
 

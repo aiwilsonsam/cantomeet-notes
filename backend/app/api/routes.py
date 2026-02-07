@@ -4,6 +4,8 @@ from fastapi import APIRouter
 
 from app.api.auth import router as auth_router
 from app.api.meetings import router as meetings_router
+from app.api.prompt_templates import router as prompt_templates_router
+from app.api.workspace_tags import router as workspace_tags_router
 from app.api.tasks import router as tasks_router
 from app.api.transcription import router as transcription_router
 from app.api.workspaces import router as workspaces_router
@@ -14,6 +16,8 @@ api_router = APIRouter(prefix="/api")
 api_router.include_router(auth_router)
 api_router.include_router(workspaces_router)
 api_router.include_router(meetings_router)
+api_router.include_router(prompt_templates_router)
+api_router.include_router(workspace_tags_router)
 api_router.include_router(tasks_router)
 api_router.include_router(transcription_router)
 

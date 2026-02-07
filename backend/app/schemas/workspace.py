@@ -27,6 +27,19 @@ class CreateWorkspaceRequest(BaseModel):
     plan: WorkspacePlan = Field(default=WorkspacePlan.FREE, description="Workspace plan")
 
 
+class WorkspaceSettingsResponse(BaseModel):
+    """Schema for workspace AI/settings response."""
+
+    summarization_model: str | None
+    available_models: list[dict[str, str]]  # [{id, name, provider}, ...]
+
+
+class WorkspaceSettingsUpdate(BaseModel):
+    """Schema for updating workspace settings."""
+
+    summarization_model: str | None = None
+
+
 class JoinWorkspaceRequest(BaseModel):
     """Schema for joining a workspace via invite code."""
 

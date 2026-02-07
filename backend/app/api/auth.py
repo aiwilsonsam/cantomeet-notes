@@ -9,7 +9,13 @@ from app.core.dependencies import CurrentUser
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.db.session import get_session
 from app.models.user import User
-from app.models.workspace import Workspace, WorkspaceMember, WorkspacePlan, WorkspaceRole
+from app.models.workspace import (
+    Workspace,
+    WorkspaceAccessLevel,
+    WorkspaceMember,
+    WorkspacePlan,
+    WorkspaceRole,
+)
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -106,11 +112,12 @@ def register(
     db.add(workspace)
     db.flush()  # Get workspace ID
 
-    # Add user as admin of the workspace
+    # Add user as admin of the workspace (role and access_level both ADMIN)
     membership = WorkspaceMember(
         workspace_id=workspace.id,
         user_id=user.id,
         role=WorkspaceRole.ADMIN,
+        access_level=WorkspaceAccessLevel.ADMIN,
     )
     db.add(membership)
     db.commit()

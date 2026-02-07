@@ -299,13 +299,14 @@ def extract_participants(transcript: Transcript | None) -> list[SpeakerResponse]
                 "avatar": "",  # TODO: Generate avatar from name initials
             }
 
-    # Convert to list and generate avatars
+    # Convert to list and generate avatar URLs (ui-avatars.com for online profile pictures)
+    from urllib.parse import quote
+
     result = []
     for speaker_id, speaker_data in speakers_map.items():
-        # Generate avatar initials
         name = speaker_data["name"]
-        initials = "".join([word[0].upper() for word in name.split()[:2]]) if name else "U"
-        speaker_data["avatar"] = initials
+        display_name = name if name and name != "Unknown" else f"Speaker {speaker_id}"
+        speaker_data["avatar"] = f"https://ui-avatars.com/api/?name={quote(display_name)}&background=random&size=80"
 
         result.append(SpeakerResponse(**speaker_data))
 
@@ -390,6 +391,8 @@ def map_meeting_to_detail(meeting: Meeting, transcript: Transcript | None, summa
             actionItems=action_items,
         )
 
+    transcript_content = transcript.content if transcript and transcript.content else None
+
     return MeetingDetailResponse(
         id=meeting.id,
         workspaceId=meeting.workspace_id or "",
@@ -399,6 +402,7 @@ def map_meeting_to_detail(meeting: Meeting, transcript: Transcript | None, summa
         participants=participants,
         tags=meeting.tags or [],
         transcript=transcript_segments,
+        transcriptContent=transcript_content,
         summary=summary_response,
         hubSpotSynced=meeting.hubspot_synced,
         status=map_meeting_status(meeting.status),

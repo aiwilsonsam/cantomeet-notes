@@ -253,8 +253,11 @@ def transcribe_meeting_task(meeting_id: str, task_id: str | None = None) -> dict
             )
             db.add(transcript)
 
-        # Update meeting status to SUMMARIZING (ready for LLM summary task)
+        # Update meeting status and audio duration from transcript
         meeting.status = MeetingStatus.SUMMARIZING
+        duration_sec = normalized.get("duration_seconds")
+        if duration_sec is not None:
+            meeting.audio_duration_seconds = int(duration_sec)
 
         # Update ProcessingTask to REVIEW_READY (transcription complete, ready for review)
         if processing_task:

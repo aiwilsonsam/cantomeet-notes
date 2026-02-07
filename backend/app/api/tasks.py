@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
 from app.db.session import get_session
+from app.models.meeting import Meeting
 from app.models.processing_task import ProcessingTask, TaskStatus
 from app.models.user import User
 from app.models.workspace import WorkspaceMember
@@ -91,6 +92,13 @@ def list_tasks(
         if task.start_time:
             start_time_str = task.start_time.isoformat()
 
+        # Get template from linked meeting (for Review & Configure)
+        template = None
+        if task.meeting_id:
+            meeting = db.query(Meeting).filter(Meeting.id == task.meeting_id).first()
+            if meeting and meeting.template:
+                template = meeting.template
+
         result.append(
             ProcessingTaskListResponse(
                 id=task.id,
@@ -101,6 +109,8 @@ def list_tasks(
                 progress=task.progress,
                 logs=task.logs or [],
                 startTime=start_time_str,
+                meetingId=task.meeting_id,
+                template=template,
             )
         )
 

@@ -68,6 +68,7 @@ class MeetingDetailResponse(BaseModel):
     participants: list[SpeakerResponse]
     tags: list[str]
     transcript: list[TranscriptSegmentResponse]
+    transcriptContent: Optional[str] = None  # Raw transcript content for copy
     summary: Optional[MeetingSummaryResponse] = None
     hubSpotSynced: bool
     status: str  # 'uploaded' | 'transcribing' | 'summarizing' | 'completed' | 'failed' | 'scheduled'

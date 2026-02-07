@@ -22,6 +22,9 @@ backend/
   - macOS: `brew install redis` then `brew services start redis`
   - Linux: `sudo apt-get install redis-server` or use Docker
   - Docker: `docker run -d -p 6379:6379 redis:7-alpine`
+- ffmpeg (for Whisper with audio files > 25MB; used by pydub for chunking)
+  - macOS: `brew install ffmpeg`
+  - Linux: `sudo apt-get install ffmpeg`
 - (Optional) [`uv`](https://github.com/astral-sh/uv) or `pip` for dependency installation
 
 ## Local Development
@@ -76,16 +79,21 @@ backend/
    docker run -d -p 6379:6379 --name redis redis:7-alpine
    ```
 
-6. **Start the RQ worker** (in a separate terminal)
+6. **Start the RQ worker(s)** (in a separate terminal)
    ```bash
-   # Option 1: Using the script
+   # Single worker (default)
+   # macOS (recommended - fixes fork/Objective-C crash)
+   ./scripts/start_worker_safe.sh
+   
+   # Or set env var manually on macOS:
+   OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES python -m app.tasks.worker
+   
+   # Linux / other
    ./scripts/start_worker.sh
+   # or: python -m app.tasks.worker
    
-   # Option 2: Using rq command directly
-   rq worker --with-scheduler default high_priority
-   
-   # Option 3: Using Python module
-   python -m app.tasks.worker
+   # Multiple workers (parallel processing for multi-user / multi-workspace)
+   ./scripts/start_workers_safe.sh 3   # Start 3 workers
    ```
    The worker processes background tasks (transcription, summarization) asynchronously.
 
@@ -115,8 +123,17 @@ This will:
 
 The backend uses **RQ (Redis Queue)** for asynchronous processing of long-running tasks:
 
-- **Transcription tasks**: Process audio files via Speechmatics API (may take 10-30 minutes for 1-2 hour recordings)
-- **Summarization tasks**: Generate meeting summaries via LLM (to be implemented)
+- **Transcription tasks**: Process audio files via Speechmatics/Whisper API
+- **Summarization tasks**: Generate meeting summaries via LLM
+
+### Concurrency (Multi-user, Multi-workspace)
+
+To support parallel processing (multiple users, multiple workspaces, simultaneous uploads):
+
+- **Local**: Run multiple workers with `./scripts/start_workers_safe.sh 3`
+- **Docker**: Scale workers with `docker compose up -d --scale worker=3`
+
+Each worker processes one job at a time; multiple workers enable concurrent transcription and summarization.
 
 When you upload a meeting audio file, the API:
 1. Immediately saves the file and creates a Meeting record

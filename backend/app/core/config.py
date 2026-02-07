@@ -34,6 +34,32 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
 
+    # Summarization provider: "openai" (direct OpenAI) or "dify" (Dify Chatflow)
+    summarization_provider: Literal["openai", "dify"] = Field(
+        default="openai",
+        validation_alias="SUMMARIZATION_PROVIDER",
+        description="Summarization provider: 'openai' or 'dify' (Dify Chatflow)",
+    )
+
+    # Dify Chatflow API (when summarization_provider=dify)
+    dify_api_base_url: str = Field(
+        default="http://108.171.193.48:8088/v1",
+        validation_alias="DIFY_API_BASE_URL",
+        description="Dify API base URL (e.g. http://host:port/v1)",
+    )
+    dify_api_key: str | None = Field(
+        default=None,
+        validation_alias="DIFY_API_KEY",
+        description="Dify Chatflow API key (app-specific)",
+    )
+
+    # Summarization default model (fallback when workspace has none)
+    summarization_default_model: str = Field(
+        default="gpt-4o",
+        validation_alias="SUMMARIZATION_DEFAULT_MODEL",
+        description="Default LLM for meeting summaries when workspace has none",
+    )
+
     # ASR Provider selection
     asr_provider: Literal["speechmatics", "whisper"] = Field(
         default="speechmatics",
