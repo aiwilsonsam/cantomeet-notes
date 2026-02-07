@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CurrentUser } from '@/types';
 import { X, User, CreditCard, Check, Zap } from 'lucide-react';
+import { Avatar } from '@/components/shared/Avatar';
 
 interface UserProfileModalProps {
   user: CurrentUser;
@@ -68,7 +69,7 @@ export const UserProfileModal = ({ user, onClose, onUpdateUser }: UserProfileMod
           {activeTab === 'profile' && (
             <div className="space-y-6 max-w-md">
               <div className="flex items-center gap-4 mb-6">
-                <img src={user.avatar} className="w-20 h-20 rounded-full border-4 border-white shadow-sm" />
+                <Avatar src={user.avatar} name={user.name || 'User'} size="xl" className="border-4 border-white shadow-sm" />
                 <div>
                   <button className="text-sm text-primary-600 font-medium hover:underline">Change Avatar</button>
                   <p className="text-xs text-slate-400 mt-1">JPG, GIF or PNG. Max size of 800K</p>

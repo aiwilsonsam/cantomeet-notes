@@ -78,3 +78,114 @@
   background-color: #94a3b8;
 }
 
+/* ============================================
+   Meeting Minutes Template Styles
+   Dify-inspired: compact line spacing, clear hierarchy
+   ============================================ */
+.meeting-minutes {
+  @apply text-slate-900 mx-auto;
+  font-family: 'Inter', 'Noto Sans TC', 'PingFang TC', -apple-system, sans-serif;
+  max-width: 65ch;
+  line-height: 1.5;
+}
+
+/* Main title */
+.meeting-minutes h1 {
+  @apply text-[19px] font-semibold text-slate-900 mb-4 mt-0;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+/* Section headings (一、二、三、) */
+.meeting-minutes h2 {
+  @apply text-[15px] font-semibold text-slate-900 mt-6 mb-2;
+  line-height: 1.4;
+}
+
+.meeting-minutes h2:first-of-type {
+  margin-top: 0;
+}
+
+/* Sub-headings (1. 2. 3.) */
+.meeting-minutes h3 {
+  @apply text-[14px] font-medium text-slate-800 mt-4 mb-1.5;
+}
+
+/* Paragraphs - compact line spacing */
+.meeting-minutes p {
+  @apply text-slate-900 text-[15px] mb-3 mt-0;
+  line-height: 1.5;
+}
+
+/* Metadata block (时间:, 地点:, 与会人员:) */
+.meeting-minutes p:first-of-type,
+.meeting-minutes .meeting-meta p {
+  @apply text-slate-800 text-[15px] mb-2;
+  line-height: 1.5;
+}
+
+/* Divider */
+.meeting-minutes hr {
+  @apply my-4 border-0 border-t border-slate-200;
+}
+
+/* Bullet lists - compact spacing like Dify */
+.meeting-minutes ul {
+  @apply list-disc list-outside ml-5 pl-1 space-y-1.5 mb-4;
+  --tw-list-decoration-color: #64748b;
+}
+
+.meeting-minutes ul li {
+  @apply text-slate-900 text-[15px] pl-1;
+  line-height: 1.5;
+}
+
+/* Ordered lists */
+.meeting-minutes ol {
+  @apply list-decimal list-outside ml-5 pl-1 space-y-1.5 mb-4;
+}
+
+.meeting-minutes ol li {
+  @apply text-slate-900 text-[15px] pl-1;
+  line-height: 1.5;
+}
+
+/* Bold for headings and emphasis */
+.meeting-minutes strong {
+  @apply font-semibold text-slate-900;
+}
+
+/* Tables - compact rows like Dify */
+.meeting-minutes table {
+  @apply w-full border-collapse my-4 text-[14px];
+}
+
+.meeting-minutes th {
+  @apply border border-slate-200 bg-slate-50/80 px-3 py-2 text-left font-medium text-slate-800;
+  line-height: 1.4;
+}
+
+.meeting-minutes td {
+  @apply border border-slate-200 px-3 py-2 text-slate-900;
+  line-height: 1.4;
+}
+
+.meeting-minutes tbody tr:hover {
+  @apply bg-slate-50/50;
+}
+
+/* Code blocks */
+.meeting-minutes pre {
+  @apply bg-slate-50 p-3 rounded-md my-4 overflow-x-auto text-[13px] border border-slate-100;
+}
+
+.meeting-minutes code {
+  @apply text-slate-800 bg-slate-100/80 px-1.5 py-0.5 rounded text-[13px] font-mono;
+}
+
+/* Blockquote */
+.meeting-minutes blockquote {
+  @apply border-l-2 border-slate-200 pl-4 my-3 text-slate-700 italic text-[15px];
+  line-height: 1.5;
+}
+

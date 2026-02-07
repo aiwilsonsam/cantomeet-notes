@@ -20,6 +20,9 @@ import {
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '@/services/api/settings';
+import { promptTemplatesApi, type PromptTemplate } from '@/services/api/promptTemplates';
+import { workspaceTagsApi, type WorkspaceTag } from '@/services/api/workspaceTags';
+import { workspaceSettingsApi, type WorkspaceSettings } from '@/services/api/workspaceSettings';
 import { Integration, MeetingTemplate } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -78,9 +81,16 @@ export const SettingsPage = () => {
   const [newProvider, setNewProvider] = useState({ name: '', endpoint: '', key: '', model: '' });
   const [customProviders, setCustomProviders] = useState<{ name: string; model: string }[]>([]);
   const [editingTemplate, setEditingTemplate] = useState<MeetingTemplate | null>(null);
+  const [editingPromptTemplate, setEditingPromptTemplate] = useState<PromptTemplate | null>(null);
   const [newSectionInput, setNewSectionInput] = useState('');
-  const [tags, setTags] = useState<string[]>(['Strategic', 'Engineering', 'Budget', 'Sales', 'Internal', 'External']);
   const [newTag, setNewTag] = useState('');
+
+  const { data: promptTemplates = [] } = useQuery<PromptTemplate[]>({
+    queryKey: ['promptTemplates', activeWorkspace?.id],
+    queryFn: () =>
+      activeWorkspace ? promptTemplatesApi.list(activeWorkspace.id) : Promise.resolve([]),
+    enabled: !!activeWorkspace && activeTab === 'templates',
+  });
 
   const { data: integrations = [] } = useQuery<Integration[]>({
     queryKey: ['integrations', activeWorkspace?.id],
@@ -92,6 +102,19 @@ export const SettingsPage = () => {
     queryKey: ['templates', activeWorkspace?.id],
     queryFn: () => (activeWorkspace ? settingsApi.getTemplates(activeWorkspace.id) : []),
     enabled: !!activeWorkspace,
+  });
+
+  const { data: workspaceTags = [] } = useQuery<WorkspaceTag[]>({
+    queryKey: ['workspaceTags', activeWorkspace?.id],
+    queryFn: () =>
+      activeWorkspace ? workspaceTagsApi.list(activeWorkspace.id) : Promise.resolve([]),
+    enabled: !!activeWorkspace && activeTab === 'templates',
+  });
+
+  const { data: workspaceSettings } = useQuery<WorkspaceSettings | undefined>({
+    queryKey: ['workspaceSettings', activeWorkspace?.id],
+    queryFn: () => (activeWorkspace ? workspaceSettingsApi.get(activeWorkspace.id) : undefined),
+    enabled: !!activeWorkspace && activeTab === 'ai',
   });
 
   const connectIntegrationMutation = useMutation({
@@ -135,6 +158,53 @@ export const SettingsPage = () => {
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to delete template');
+    },
+  });
+
+  const savePromptTemplateMutation = useMutation({
+    mutationFn: async (data: { workspace_id: string; name: string; content: string }) => {
+      return promptTemplatesApi.create(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['promptTemplates', activeWorkspace?.id] });
+      toast.success('提示詞模板已儲存');
+      setEditingPromptTemplate(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to save prompt template');
+    },
+  });
+
+  const updatePromptTemplateMutation = useMutation({
+    mutationFn: async ({
+      id,
+      name,
+      content,
+    }: {
+      id: string;
+      name?: string;
+      content?: string;
+    }) => {
+      return promptTemplatesApi.update(id, { name, content });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['promptTemplates', activeWorkspace?.id] });
+      toast.success('提示詞模板已更新');
+      setEditingPromptTemplate(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update prompt template');
+    },
+  });
+
+  const deletePromptTemplateMutation = useMutation({
+    mutationFn: async (id: string) => promptTemplatesApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['promptTemplates', activeWorkspace?.id] });
+      toast.success('提示詞模板已刪除');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete prompt template');
     },
   });
 
@@ -229,16 +299,54 @@ export const SettingsPage = () => {
     setEditingTemplate({ ...editingTemplate, structure: newStructure });
   };
 
-  const addTag = () => {
-    if (newTag && !tags.includes(newTag)) {
-      setTags([...tags, newTag]);
+  const addTagMutation = useMutation({
+    mutationFn: async (name: string) => {
+      if (!activeWorkspace) throw new Error('No active workspace');
+      return workspaceTagsApi.create({ workspace_id: activeWorkspace.id, name: name.trim() });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspaceTags', activeWorkspace?.id] });
       setNewTag('');
+      toast.success('Tag added');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to add tag');
+    },
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: (tagId: string) => workspaceTagsApi.delete(tagId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspaceTags', activeWorkspace?.id] });
+      toast.success('Tag removed');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to remove tag');
+    },
+  });
+
+  const addTag = () => {
+    const trimmed = newTag.trim();
+    if (trimmed && !workspaceTags.some((t) => t.name.toLowerCase() === trimmed.toLowerCase())) {
+      addTagMutation.mutate(trimmed);
+    } else if (trimmed) {
+      toast.error('Tag already exists');
     }
   };
 
-  const deleteTag = (tag: string) => {
-    setTags(tags.filter((t) => t !== tag));
-  };
+  const updateSummarizationModelMutation = useMutation({
+    mutationFn: async (model: string | null) => {
+      if (!activeWorkspace) throw new Error('No active workspace');
+      return workspaceSettingsApi.update(activeWorkspace.id, { summarization_model: model });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspaceSettings', activeWorkspace?.id] });
+      toast.success('Summarization model updated');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update model');
+    },
+  });
 
   const getTemplateIcon = (type: string) => {
     switch (type) {
@@ -259,10 +367,10 @@ export const SettingsPage = () => {
           <h2 className="text-xl font-bold text-slate-900 px-4 mb-6">Settings</h2>
           <nav className="space-y-1">
             <SettingsTab
-              label="Integrations"
-              active={activeTab === 'integrations'}
-              onClick={() => setActiveTab('integrations')}
-              icon={<RefreshCw size={18} />}
+              label="General"
+              active={activeTab === 'general'}
+              onClick={() => setActiveTab('general')}
+              icon={<Globe size={18} />}
             />
             <SettingsTab
               label="AI & Models"
@@ -271,16 +379,16 @@ export const SettingsPage = () => {
               icon={<Cpu size={18} />}
             />
             <SettingsTab
-              label="Templates & Tags"
+              label="Integrations"
+              active={activeTab === 'integrations'}
+              onClick={() => setActiveTab('integrations')}
+              icon={<RefreshCw size={18} />}
+            />
+            <SettingsTab
+              label="Templates"
               active={activeTab === 'templates'}
               onClick={() => setActiveTab('templates')}
               icon={<Edit2 size={18} />}
-            />
-            <SettingsTab
-              label="General"
-              active={activeTab === 'general'}
-              onClick={() => setActiveTab('general')}
-              icon={<Globe size={18} />}
             />
             <SettingsTab label="Security" active={false} onClick={() => {}} icon={<Lock size={18} />} />
           </nav>
@@ -358,9 +466,29 @@ export const SettingsPage = () => {
 
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
                 <h4 className="font-semibold text-slate-800 mb-4">Summarization Model</h4>
+                <p className="text-xs text-slate-500 mb-4">
+                  Default model for generating meeting minutes. Select one to set as workspace default.
+                </p>
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <ModelOption name="GPT-4o" description="Highest reasoning capability" active />
-                  <ModelOption name="Claude 3.5 Sonnet" description="Natural, human-like writing" />
+                  {(workspaceSettings?.available_models || []).map((m) => (
+                    <div
+                      key={m.id}
+                      onClick={() => updateSummarizationModelMutation.mutate(m.id)}
+                      className={`p-4 rounded-lg border cursor-pointer transition-all ${
+                        (workspaceSettings?.summarization_model || 'gpt-4o') === m.id
+                          ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-500'
+                          : 'border-slate-200 hover:border-primary-300'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-semibold text-slate-900 text-sm">{m.name}</span>
+                        {(workspaceSettings?.summarization_model || 'gpt-4o') === m.id && (
+                          <Check size={16} className="text-primary-600" />
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">{m.provider}</p>
+                    </div>
+                  ))}
                 </div>
 
                 {customProviders.map((cp, idx) => (
@@ -439,6 +567,68 @@ export const SettingsPage = () => {
               <h3 className="text-lg font-bold text-slate-900 mb-2">Templates & Tags</h3>
               <p className="text-slate-500 mb-6">Standardize your meeting records.</p>
 
+              {/* Prompt Templates - 會議紀要提示詞 */}
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-8">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="font-semibold text-slate-800">會議紀要提示詞 (Prompt Templates)</h4>
+                  <button
+                    onClick={() =>
+                      setEditingPromptTemplate({
+                        id: '',
+                        workspace_id: activeWorkspace?.id || '',
+                        name: '',
+                        content: '根据以下中粤会话的转录，生成一份会议纪要。\n{{content}}',
+                      })
+                    }
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+                  >
+                    <Plus size={16} /> 新增提示詞
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mb-4">
+                  使用 <code className="bg-slate-100 px-1 rounded">{'{{content}}'}</code> 作為轉錄內容的佔位符
+                </p>
+                <div className="space-y-3">
+                  {promptTemplates.map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-colors group"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="font-medium text-slate-800 block truncate">{t.name}</span>
+                        <span className="text-xs text-slate-500 truncate block">
+                          {t.content.substring(0, 60)}
+                          {t.content.length > 60 ? '...' : ''}
+                        </span>
+                      </div>
+                      <div className="flex gap-2 ml-2">
+                        <button
+                          onClick={() => setEditingPromptTemplate({ ...t })}
+                          className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-slate-100 rounded"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm('確定要刪除此提示詞模板？')) {
+                              deletePromptTemplateMutation.mutate(t.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {promptTemplates.length === 0 && (
+                    <p className="text-sm text-slate-400 py-4 text-center">
+                      尚無自訂提示詞。點擊「新增提示詞」創建。
+                    </p>
+                  )}
+                </div>
+              </div>
+
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-8">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="font-semibold text-slate-800">Meeting Templates</h4>
@@ -511,14 +701,21 @@ export const SettingsPage = () => {
 
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                 <h4 className="font-semibold text-slate-800 mb-4">Global Tags</h4>
+                <p className="text-xs text-slate-500 mb-4">
+                  Tags available when reviewing meetings. Used in Review &amp; Configure.
+                </p>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {tags.map((tag) => (
+                  {workspaceTags.map((tag) => (
                     <span
-                      key={tag}
+                      key={tag.id}
                       className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm"
                     >
-                      {tag}
-                      <button onClick={() => deleteTag(tag)} className="hover:text-red-500">
+                      {tag.name}
+                      <button
+                        onClick={() => deleteTagMutation.mutate(tag.id)}
+                        disabled={deleteTagMutation.isPending}
+                        className="hover:text-red-500"
+                      >
                         <X size={14} />
                       </button>
                     </span>
@@ -535,9 +732,10 @@ export const SettingsPage = () => {
                   />
                   <button
                     onClick={addTag}
-                    className="bg-slate-800 text-white px-3 py-2 rounded-md text-sm font-medium"
+                    disabled={addTagMutation.isPending || !newTag.trim()}
+                    className="bg-slate-800 text-white px-3 py-2 rounded-md text-sm font-medium disabled:opacity-50"
                   >
-                    Add
+                    {addTagMutation.isPending ? 'Adding...' : 'Add'}
                   </button>
                 </div>
               </div>
@@ -789,6 +987,102 @@ export const SettingsPage = () => {
                 className="px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm disabled:opacity-50"
               >
                 <Save size={16} /> {saveTemplateMutation.isPending ? 'Saving...' : 'Save Template'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prompt Template Editor Modal */}
+      {editingPromptTemplate && (
+        <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl p-6 flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+              <h3 className="text-lg font-bold text-slate-900">
+                {editingPromptTemplate.id ? '編輯提示詞模板' : '新增提示詞模板'}
+              </h3>
+              <button onClick={() => setEditingPromptTemplate(null)}>
+                <X size={20} className="text-slate-400 hover:text-slate-600" />
+              </button>
+            </div>
+
+            <div className="space-y-5 overflow-y-auto pr-2 flex-1">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  模板名稱
+                </label>
+                <input
+                  type="text"
+                  value={editingPromptTemplate.name}
+                  onChange={(e) =>
+                    setEditingPromptTemplate({ ...editingPromptTemplate, name: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                  placeholder="e.g., 粵語會議紀要"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  提示詞內容（使用 <code className="bg-slate-100 px-1 rounded">{'{{content}}'}</code> 作為轉錄佔位符）
+                </label>
+                <textarea
+                  value={editingPromptTemplate.content}
+                  onChange={(e) =>
+                    setEditingPromptTemplate({ ...editingPromptTemplate, content: e.target.value })
+                  }
+                  rows={6}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-mono"
+                  placeholder="根据以下中粤会话的转录，生成一份会议纪要。&#10;{{content}}"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => setEditingPromptTemplate(null)}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  if (!editingPromptTemplate.name?.trim()) {
+                    toast.error('請輸入模板名稱');
+                    return;
+                  }
+                  if (!editingPromptTemplate.content?.includes('{{content}}')) {
+                    toast.error('提示詞必須包含 {{content}} 佔位符');
+                    return;
+                  }
+                  if (activeWorkspace) {
+                    if (editingPromptTemplate.id) {
+                      updatePromptTemplateMutation.mutate({
+                        id: editingPromptTemplate.id,
+                        name: editingPromptTemplate.name,
+                        content: editingPromptTemplate.content,
+                      });
+                    } else {
+                      savePromptTemplateMutation.mutate({
+                        workspace_id: activeWorkspace.id,
+                        name: editingPromptTemplate.name,
+                        content: editingPromptTemplate.content,
+                      });
+                    }
+                  }
+                }}
+                disabled={
+                  !editingPromptTemplate.name?.trim() ||
+                  !editingPromptTemplate.content?.includes('{{content}}') ||
+                  savePromptTemplateMutation.isPending ||
+                  updatePromptTemplateMutation.isPending
+                }
+                className="px-4 py-2 bg-primary-600 text-white hover:bg-primary-700 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm disabled:opacity-50"
+              >
+                <Save size={16} />
+                {savePromptTemplateMutation.isPending || updatePromptTemplateMutation.isPending
+                  ? '儲存中...'
+                  : '儲存'}
               </button>
             </div>
           </div>

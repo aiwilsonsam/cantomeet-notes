@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { MeetingSummary, ActionItem } from '@/types';
 import {
   Sparkles,
@@ -174,11 +176,11 @@ export const SummaryView = ({
         </div>
       </div>
 
-      <div className="p-8 max-w-3xl mx-auto w-full pb-24">
+      <div className="p-6 max-w-4xl mx-auto w-full pb-24">
         {activeTab === 'minutes' ? (
           <div className="space-y-8">
             {/* Executive Summary */}
-            <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <section className="bg-white p-7 rounded-xl shadow-sm border border-slate-200">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-wide">
                   <Lightbulb size={16} /> 摘要 Executive Summary
@@ -295,8 +297,8 @@ export const SummaryView = ({
           </div>
         ) : activeTab === 'detailed' ? (
           <div className="space-y-6">
-            {/* Detailed Meeting Minutes */}
-            <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            {/* Detailed Meeting Minutes - document-style panel */}
+            <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 min-h-[400px]">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="flex items-center gap-2 text-sm font-bold text-slate-500 uppercase tracking-wide">
                   <Lightbulb size={16} /> 会议纪要 Meeting Minutes
@@ -366,163 +368,80 @@ export const SummaryView = ({
                   </div>
                 </div>
               ) : (
-                <div className="prose prose-slate max-w-none">
+                <div className="max-w-none">
                   {summary.detailedMinutes ? (
-                    <div className="text-slate-800 leading-7 text-base markdown-content">
-                      {(() => {
-                        // Pre-process: Aggressively remove extra blank lines
-                        // Strategy: Remove all blank lines, spacing will be handled by CSS margins
-                        const lines = summary.detailedMinutes.split('\n');
-                        const cleanedLines: string[] = [];
-                        
-                        for (let i = 0; i < lines.length; i++) {
-                          const line = lines[i];
-                          const trimmed = line.trim();
-                          
-                          // Skip blank lines entirely - spacing will be handled by block margins
-                          if (!trimmed) {
-                            continue;
-                          }
-                          
-                          cleanedLines.push(line);
-                        }
-                        
-                        // Group lines into blocks (headers, lists, paragraphs, etc.)
-                        type BlockType = 'header' | 'ordered-list' | 'unordered-list' | 'paragraph' | 'hr' | 'blank';
-                        interface Block {
-                          type: BlockType;
-                          lines: string[];
-                          startIdx: number;
-                        }
-                        
-                        const blocks: Block[] = [];
-                        let currentBlock: Block | null = null;
-                        
-                        for (let i = 0; i < cleanedLines.length; i++) {
-                          const line = cleanedLines[i];
-                          const trimmed = line.trim();
-                          
-                          // Determine block type
-                          let blockType: BlockType;
-                          if (trimmed.match(/^#{1,6}\s+/)) {
-                            blockType = 'header';
-                          } else if (trimmed === '------' || trimmed === '---') {
-                            blockType = 'hr';
-                          } else if (/^\d+\.\s+/.test(trimmed)) {
-                            blockType = 'ordered-list';
-                          } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-                            blockType = 'unordered-list';
-                          } else {
-                            blockType = 'paragraph';
-                          }
-                          
-                          // Start new block or continue current one
-                          // Note: blank lines are already filtered out, so we don't need to handle 'blank' type
-                          if (!currentBlock || currentBlock.type !== blockType || blockType === 'header' || blockType === 'hr') {
-                            // Save previous block
-                            if (currentBlock) {
-                              blocks.push(currentBlock);
-                            }
-                            // Start new block
-                            currentBlock = {
-                              type: blockType,
-                              lines: [line],
-                              startIdx: i,
-                            };
-                          } else {
-                            // Continue current block (for lists and paragraphs)
-                            currentBlock.lines.push(line);
-                          }
-                        }
-                        
-                        // Don't forget the last block
-                        if (currentBlock) {
-                          blocks.push(currentBlock);
-                        }
-                        
-                        // Render blocks
-                        return blocks.map((block, blockIdx) => {
-                          if (block.type === 'header') {
-                            const line = block.lines[0];
-                            let cleanedLine = line;
-                            
-                            // Remove ** from headers if present
-                            if (line.includes('**')) {
-                              cleanedLine = line.replace(/\*\*/g, '');
-                            }
-                            
-                            const headerMatch = cleanedLine.match(/^(#{1,6})\s+(.+)$/);
-                            if (headerMatch) {
-                              const level = headerMatch[1].length;
-                              const text = headerMatch[2].trim();
-                              
-                              if (level === 1) {
-                                return (
-                                  <h1 key={blockIdx} className="text-2xl font-bold mt-10 mb-5 text-slate-900 border-b border-slate-200 pb-2">
-                                    {text}
-                                  </h1>
-                                );
-                              } else if (level === 2) {
-                                return (
-                                  <h2 key={blockIdx} className="text-xl font-bold mt-8 mb-4 text-slate-900">
-                                    {text}
-                                  </h2>
-                                );
-                              } else if (level === 3) {
-                                return (
-                                  <h3 key={blockIdx} className="text-lg font-bold mt-6 mb-3 text-slate-900">
-                                    {text}
-                                  </h3>
-                                );
-                              }
-                            }
-                            return null;
-                          }
-                          
-                          if (block.type === 'hr') {
-                            return <hr key={blockIdx} className="my-6 border-slate-200" />;
-                          }
-                          
-                          if (block.type === 'ordered-list') {
-                            return (
-                              <ol key={blockIdx} className="ml-6 mb-4 list-decimal space-y-1">
-                                {block.lines.map((line, lineIdx) => {
-                                  const processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
-                                  const content = processedLine.replace(/^\d+\.\s+/, '');
-                                  return (
-                                    <li key={lineIdx} className="text-slate-700" dangerouslySetInnerHTML={{ __html: content }} />
-                                  );
-                                })}
-                              </ol>
-                            );
-                          }
-                          
-                          if (block.type === 'unordered-list') {
-                            return (
-                              <ul key={blockIdx} className="ml-6 mb-4 list-disc space-y-1">
-                                {block.lines.map((line, lineIdx) => {
-                                  const processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
-                                  const content = processedLine.replace(/^[-*]\s+/, '');
-                                  return (
-                                    <li key={lineIdx} className="text-slate-700" dangerouslySetInnerHTML={{ __html: content }} />
-                                  );
-                                })}
-                              </ul>
-                            );
-                          }
-                          
-                          if (block.type === 'paragraph') {
-                            return block.lines.map((line, lineIdx) => {
-                              const processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
-                              return (
-                                <p key={`${blockIdx}-${lineIdx}`} className="mb-3 text-slate-700" dangerouslySetInnerHTML={{ __html: processedLine }} />
-                              );
-                            });
-                          }
-                          
-                          return null;
-                        });
-                      })()}
+                    <div className="meeting-minutes pt-1">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          h1: ({ children }) => (
+                            <h1 className="text-[19px] font-semibold text-slate-900 mb-4 mt-0 tracking-tight">
+                              {children}
+                            </h1>
+                          ),
+                          h2: ({ children }) => (
+                            <h2 className="text-[15px] font-semibold text-slate-900 mt-6 mb-2 first:mt-0">
+                              {children}
+                            </h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="text-[14px] font-medium text-slate-800 mt-4 mb-1.5">
+                              {children}
+                            </h3>
+                          ),
+                          p: ({ children }) => (
+                            <p className="text-slate-900 text-[15px] mb-3 mt-0 leading-[1.5]">
+                              {children}
+                            </p>
+                          ),
+                          ul: ({ children }) => (
+                            <ul className="list-disc list-outside ml-5 pl-1 space-y-1.5 mb-4 text-slate-900">
+                              {children}
+                            </ul>
+                          ),
+                          ol: ({ children }) => (
+                            <ol className="list-decimal list-outside ml-5 pl-1 space-y-1.5 mb-4 text-slate-900">
+                              {children}
+                            </ol>
+                          ),
+                          li: ({ children }) => (
+                            <li className="text-slate-900 text-[15px] pl-1 leading-[1.5]">
+                              {children}
+                            </li>
+                          ),
+                          strong: ({ children }) => (
+                            <strong className="font-semibold text-slate-900">{children}</strong>
+                          ),
+                          table: ({ children }) => (
+                            <div className="overflow-x-auto my-4">
+                              <table className="w-full border-collapse text-[14px] min-w-[400px]">
+                                {children}
+                              </table>
+                            </div>
+                          ),
+                          thead: ({ children }) => <thead>{children}</thead>,
+                          tbody: ({ children }) => <tbody>{children}</tbody>,
+                          tr: ({ children }) => <tr>{children}</tr>,
+                          th: ({ children }) => (
+                            <th className="border border-slate-200 bg-slate-50/80 px-3 py-2 text-left font-medium text-slate-800 leading-snug">
+                              {children}
+                            </th>
+                          ),
+                          td: ({ children }) => (
+                            <td className="border border-slate-200 px-3 py-2 text-slate-900 leading-snug">
+                              {children}
+                            </td>
+                          ),
+                          hr: () => <hr className="my-4 border-0 border-t border-slate-200" />,
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-2 border-slate-200 pl-4 my-3 text-slate-700 italic text-[15px] leading-[1.5]">
+                              {children}
+                            </blockquote>
+                          ),
+                        }}
+                      >
+                        {summary.detailedMinutes}
+                      </ReactMarkdown>
                     </div>
                   ) : meetingStatus === 'summarizing' ? (
                     <div className="flex items-center gap-3 py-8">

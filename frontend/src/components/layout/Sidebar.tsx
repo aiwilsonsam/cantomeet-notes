@@ -25,6 +25,7 @@ import { tasksApi } from '@/services/api/tasks';
 import { CreateWorkspaceModal } from '@/components/modals/CreateWorkspaceModal';
 import { JoinWorkspaceModal } from '@/components/modals/JoinWorkspaceModal';
 import { UserProfileModal } from '@/components/modals/UserProfileModal';
+import { Avatar } from '@/components/shared/Avatar';
 
 export const Sidebar = () => {
   const location = useLocation();
@@ -301,7 +302,7 @@ export const Sidebar = () => {
               onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
               className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-800 transition-colors group text-left"
             >
-              <img src={user.avatar} alt="User" className="w-8 h-8 rounded-full border border-slate-600" />
+              <Avatar src={user.avatar} name={user.name || 'User'} size="md" className="border border-slate-600" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white font-medium truncate">{user.name}</div>
                 <div className="text-xs text-slate-500 flex items-center gap-1">{user.plan} Plan</div>

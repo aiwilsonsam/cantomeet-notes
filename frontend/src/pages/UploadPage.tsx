@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, FileAudio, ArrowRight, Mic, X, Layers, Trash2 } from 'lucide-react';
+import { UploadCloud, FileAudio, ArrowRight, Mic, X, Layers, Trash2, LayoutTemplate } from 'lucide-react';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { meetingsApi } from '@/services/api/meetings';
+import { promptTemplatesApi } from '@/services/api/promptTemplates';
 import toast from 'react-hot-toast';
+
+const SECTIONS_TEMPLATES = [
+  { value: 'default', label: 'General – Standard meeting notes' },
+  { value: 'Product Review', label: 'Product Review – Product-focused meetings' },
+  { value: 'Sales', label: 'Sales – Sales and customer meetings' },
+];
 
 export const UploadPage = () => {
   const navigate = useNavigate();
@@ -12,15 +19,35 @@ export const UploadPage = () => {
   const queryClient = useQueryClient();
   const [files, setFiles] = useState<File[]>([]);
   const [justQueuedCount, setJustQueuedCount] = useState(0);
+  const [uploadTemplate, setUploadTemplate] = useState<string>('default');
+
+  const { data: promptTemplates = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['promptTemplates', activeWorkspace?.id],
+    queryFn: () =>
+      activeWorkspace ? promptTemplatesApi.list(activeWorkspace.id) : Promise.resolve([]),
+    enabled: !!activeWorkspace,
+  });
+
+  // Default to 粵語會議紀要 when available (only set once on first load)
+  useEffect(() => {
+    if (promptTemplates.length > 0) {
+      const yueTemplate = promptTemplates.find((t) => t.name === '粵語會議紀要');
+      if (yueTemplate) {
+        setUploadTemplate((prev) => (prev === 'default' ? `prompt:${yueTemplate.id}` : prev));
+      }
+    }
+  }, [promptTemplates]);
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       if (!activeWorkspace) {
         throw new Error('No active workspace');
       }
+      const templateValue = uploadTemplate === 'default' ? undefined : uploadTemplate;
       return meetingsApi.create({
         file,
         workspaceId: activeWorkspace.id,
+        template: templateValue,
       });
     },
     onSuccess: () => {
@@ -139,6 +166,33 @@ export const UploadPage = () => {
                   onChange={handleFileSelect}
                 />
               </label>
+            </div>
+
+            {/* Template selector */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <LayoutTemplate size={14} /> 會議紀要模板
+              </label>
+              <select
+                value={uploadTemplate}
+                onChange={(e) => setUploadTemplate(e.target.value)}
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white text-slate-700"
+              >
+                {SECTIONS_TEMPLATES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+                {promptTemplates.length > 0 && (
+                  <optgroup label="自訂提示詞">
+                    {promptTemplates.map((t) => (
+                      <option key={t.id} value={`prompt:${t.id}`}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
             </div>
 
             {/* Selected Files List */}

@@ -7,5 +7,7 @@ export interface ProcessingTask {
   progress: number; // 0-100
   logs: string[];
   startTime: string;
+  meetingId?: string;
+  template?: string; // From meeting, for Review & Configure
 }
 

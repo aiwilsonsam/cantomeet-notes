@@ -46,6 +46,7 @@ export interface Meeting {
   participants?: Speaker[];
   tags?: string[];
   transcript?: TranscriptSegment[];
+  transcriptContent?: string; // Raw transcript content for copy
   summary?: MeetingSummary;
   hubSpotSynced?: boolean;
   status: 'uploaded' | 'transcribing' | 'summarizing' | 'completed' | 'failed' | 'scheduled';

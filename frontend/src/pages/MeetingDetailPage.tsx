@@ -40,6 +40,68 @@ export const MeetingDetailPage = () => {
   const [isChatExpanded, setIsChatExpanded] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Resizable split: transcript width as percentage (20-75%), default 35% (SummaryView wider)
+  const [transcriptWidth, setTranscriptWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('meeting-transcript-width');
+      if (saved) {
+        const n = parseInt(saved, 10);
+        if (n >= 20 && n <= 75) return n;
+      }
+    } catch {
+      /* ignore */
+    }
+    return 35;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('meeting-transcript-width', String(Math.round(transcriptWidth)));
+    } catch {
+      /* ignore */
+    }
+  }, [transcriptWidth]);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartRef = useRef<{ x: number; width: number } | null>(null);
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    resizeStartRef.current = { x: e.clientX, width: transcriptWidth };
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeStartRef.current) return;
+      const container = document.querySelector('[data-meeting-split]') as HTMLElement;
+      if (!container) return;
+      const containerWidth = container.offsetWidth;
+      const deltaPx = e.clientX - resizeStartRef.current.x;
+      const deltaPercent = (deltaPx / containerWidth) * 100;
+      let newWidth = resizeStartRef.current.width + deltaPercent;
+      newWidth = Math.max(25, Math.min(75, newWidth));
+      setTranscriptWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      resizeStartRef.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
   // Fetch meeting data
   const { data: meeting, isLoading, refetch } = useQuery<Meeting>({
     queryKey: ['meeting', id],
@@ -357,19 +419,34 @@ export const MeetingDetailPage = () => {
         </div>
       </header>
 
-      {/* Content Area - Split View */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Transcript (45%) */}
-        <div className="w-[45%] border-r border-slate-200 flex flex-col min-w-[350px]">
+      {/* Content Area - Resizable Split View */}
+      <div className="flex-1 flex overflow-hidden" data-meeting-split>
+        {/* Left: Transcript */}
+        <div
+          className="flex flex-col flex-shrink-0"
+          style={{ width: `${transcriptWidth}%`, minWidth: 200 }}
+        >
           <TranscriptView
             segments={meeting.transcript || []}
             participants={meeting.participants || []}
             highlightedId={highlightedSegmentId}
+            transcriptContent={meeting.transcriptContent}
           />
         </div>
 
-        {/* Right: Summary & AI Tools (55%) */}
-        <div className="flex-1 flex flex-col bg-slate-50 min-w-[400px] relative">
+        {/* Resize Handle */}
+        <div
+          onMouseDown={handleResizeStart}
+          className={`w-1.5 flex-shrink-0 bg-slate-200 hover:bg-primary-300 cursor-col-resize flex items-center justify-center group transition-colors ${
+            isResizing ? 'bg-primary-400' : ''
+          }`}
+          title="拖动调整宽度"
+        >
+          <div className="w-0.5 h-10 bg-slate-400 group-hover:bg-white rounded-full opacity-60 group-hover:opacity-100 transition-opacity" />
+        </div>
+
+        {/* Right: Summary & AI Tools */}
+        <div className="flex-1 flex flex-col bg-slate-50 min-w-[320px] relative overflow-hidden">
           {/* Scrollable Summary Content */}
           <div className="flex-1 overflow-hidden relative flex flex-col">
             <SummaryView

@@ -12,6 +12,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useWorkspace } from '@/hooks/useWorkspace';
+import { Avatar } from '@/components/shared/Avatar';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { meetingsApi } from '@/services/api/meetings';
 import { Meeting, Speaker } from '@/types';
@@ -149,11 +150,11 @@ export const CalendarPage = () => {
     });
   };
 
-  // Mock team members - TODO: Get from API
+  // Mock team members - TODO: Get from API (Avatar uses default icon from name)
   const MOCK_TEAM: Speaker[] = [
-    { id: '1', name: 'Christina Lau', role: 'Product Lead', avatar: 'https://picsum.photos/id/1012/200/200' },
-    { id: '2', name: 'Sarah Ye', role: 'CEO', avatar: 'https://picsum.photos/id/1025/200/200' },
-    { id: '3', name: 'James Zhu', role: 'PM', avatar: 'https://picsum.photos/id/1011/200/200' },
+    { id: '1', name: 'Christina Lau', role: 'Product Lead', avatar: '' },
+    { id: '2', name: 'Sarah Ye', role: 'CEO', avatar: '' },
+    { id: '3', name: 'James Zhu', role: 'PM', avatar: '' },
   ];
 
   return (
@@ -330,7 +331,7 @@ export const CalendarPage = () => {
                       >
                         {selectedMembers.includes(member.id) && <Check size={12} className="text-white" />}
                       </div>
-                      <img src={member.avatar} className="w-6 h-6 rounded-full" alt={member.name} />
+                      <Avatar src={member.avatar} name={member.name} size="sm" />
                       <span className="text-sm text-slate-700">{member.name}</span>
                     </div>
                   ))}

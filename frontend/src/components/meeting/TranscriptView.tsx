@@ -1,28 +1,44 @@
 import { useEffect, useRef } from 'react';
-import { User } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { TranscriptSegment, Speaker } from '@/types';
+import toast from 'react-hot-toast';
 
 interface TranscriptViewProps {
   segments: TranscriptSegment[];
   participants: Speaker[];
   highlightedId: string | null;
+  transcriptContent?: string | null;
 }
 
-export const TranscriptView = ({ segments, participants, highlightedId }: TranscriptViewProps) => {
+export const TranscriptView = ({ segments, participants, highlightedId, transcriptContent }: TranscriptViewProps) => {
+  const handleCopyTranscript = async () => {
+    const text = transcriptContent || '';
+    if (!text) {
+      toast.error('暂无转录内容可复制');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('已复制转录内容');
+    } catch {
+      toast.error('复制失败');
+    }
+  };
   const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   const getSpeaker = (id: string) => participants.find((p) => p.id === id);
-  
-  // Create a map of speaker IDs to default names if not found in participants
+
   const getSpeakerName = (speakerId: string, speaker: Speaker | undefined) => {
-    if (speaker?.name) {
+    if (speaker?.name && speaker.name !== 'Unknown' && !/^Speaker\s+(?:\d+|\w+)$/.test(speaker.name)) {
       return speaker.name;
     }
-    // Generate a default name based on speaker ID or index
-    // Try to extract a number from the ID, or use a hash
-    const match = speakerId.match(/\d+/);
-    const index = match ? parseInt(match[0], 10) : speakerId.charCodeAt(0) % 10;
-    return `Speaker ${index + 1}`;
+    return 'Speaker';
+  };
+
+  const getAvatarUrl = (speakerId: string, speaker: Speaker | undefined) => {
+    const name = getSpeakerName(speakerId, speaker);
+    if (speaker?.avatar && speaker.avatar.startsWith('http')) return speaker.avatar;
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=64748b&color=fff&size=64`;
   };
 
   // Auto-scroll when highlightedId changes
@@ -36,13 +52,24 @@ export const TranscriptView = ({ segments, participants, highlightedId }: Transc
   }, [highlightedId]);
 
   return (
-    <div className="h-full overflow-y-auto p-6 bg-white border-r border-slate-200">
-      <div className="flex items-center justify-between mb-6 sticky top-0 bg-white z-10 py-2 border-b border-slate-100">
-        <h3 className="font-semibold text-slate-700">逐字稿 Transcript</h3>
-        <span className="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded">Cantonese / English</span>
+    <div className="h-full overflow-y-auto p-4 bg-white border-r border-slate-200">
+      <div className="flex items-center justify-between mb-4 sticky top-0 bg-white z-10 py-2 border-b border-slate-100">
+        <h3 className="font-semibold text-slate-700 text-sm">逐字稿 Transcript</h3>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopyTranscript}
+            disabled={!transcriptContent}
+            className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            title="复制转录全文"
+          >
+            <Copy size={14} />
+          </button>
+          <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">Cantonese / English</span>
+        </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-1.5">
         {segments.length > 0 ? (
           segments.map((seg) => {
             const speaker = getSpeaker(seg.speakerId);
@@ -54,27 +81,24 @@ export const TranscriptView = ({ segments, participants, highlightedId }: Transc
                 ref={(el) => {
                   scrollRefs.current[seg.id] = el;
                 }}
-                className={`flex gap-4 transition-colors duration-500 rounded-lg p-2 -ml-2 ${
+                className={`flex gap-2.5 transition-colors duration-500 rounded-md py-1.5 px-1.5 -mx-1.5 ${
                   isHighlighted ? 'bg-yellow-50' : ''
                 }`}
               >
-                {speaker?.avatar ? (
-                  <img
-                    src={speaker.avatar}
-                    alt={speaker?.name}
-                    className="w-10 h-10 rounded-full object-cover flex-shrink-0 mt-1"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center flex-shrink-0 mt-1">
-                    <User size={20} className="text-slate-500" />
+                <img
+                  src={getAvatarUrl(seg.speakerId, speaker)}
+                  alt={getSpeakerName(seg.speakerId, speaker)}
+                  className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-0.5"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getSpeakerName(seg.speakerId, speaker))}&background=64748b&color=fff`;
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-medium text-slate-900 text-xs">{getSpeakerName(seg.speakerId, speaker)}</span>
+                    <span className="text-[11px] text-slate-400 tabular-nums">{seg.timestamp}</span>
                   </div>
-                )}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-slate-900 text-sm">{getSpeakerName(seg.speakerId, speaker)}</span>
-                    <span className="text-xs text-slate-400">{seg.timestamp}</span>
-                  </div>
-                  <div className="text-slate-700 leading-relaxed text-[15px]">{seg.text}</div>
+                  <div className="text-slate-700 leading-snug text-[14px]">{seg.text}</div>
                 </div>
               </div>
             );
@@ -88,7 +112,7 @@ export const TranscriptView = ({ segments, participants, highlightedId }: Transc
       </div>
 
       {/* Spacer for bottom scrolling */}
-      <div className="h-20"></div>
+      <div className="h-8"></div>
     </div>
   );
 };

@@ -6,6 +6,7 @@ import { teamApi } from '@/services/api/team';
 import { TeamMember } from '@/types';
 import toast from 'react-hot-toast';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { Avatar } from '@/components/shared/Avatar';
 
 export const TeamPage = () => {
   const { activeWorkspace } = useWorkspace();
@@ -112,11 +113,7 @@ export const TeamPage = () => {
                 <tr key={member.id} className="hover:bg-slate-50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={member.avatar}
-                        alt={member.name}
-                        className="w-10 h-10 rounded-full border border-slate-200 object-cover"
-                      />
+                      <Avatar src={member.avatar} name={member.name} size="lg" className="border border-slate-200" />
                       <div>
                         <p className="font-semibold text-slate-900">{member.name}</p>
                         <div className="flex items-center gap-1.5 text-xs text-slate-500">

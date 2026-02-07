@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useWorkspace } from '@/hooks/useWorkspace';
 import { useQuery } from '@tanstack/react-query';
 import { meetingsApi } from '@/services/api/meetings';
+import { Avatar } from '@/components/shared/Avatar';
 import { Meeting } from '@/types';
 
 const StatCard: React.FC<{ title: string; value: string; change: string; urgent?: boolean }> = ({
@@ -189,15 +190,12 @@ export const DashboardPage = () => {
                 <div className="flex items-center justify-between border-t border-slate-100 pt-3">
                   <div className="flex -space-x-2">
                     {(meeting.participants || []).slice(0, 4).map((p) => (
-                      <img
+                      <Avatar
                         key={p.id}
-                        src={p.avatar || ''}
-                        alt={p.name || 'Participant'}
-                        className="w-6 h-6 rounded-full border-2 border-white"
-                        onError={(e) => {
-                          // Fallback to a default avatar if image fails to load
-                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'U')}&background=random`;
-                        }}
+                        src={p.avatar}
+                        name={p.name || 'Participant'}
+                        size="sm"
+                        className="border-2 border-white"
                       />
                     ))}
                   </div>

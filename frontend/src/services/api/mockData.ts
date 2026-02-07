@@ -1,10 +1,10 @@
 import { ProcessingTask, Meeting, Speaker } from '@/types';
 
-// Mock Speakers
+// Mock Speakers (avatar: '' uses default icon from name via Avatar component)
 const MOCK_SPEAKERS: Speaker[] = [
-  { id: 'u1', name: 'Christina Lau', role: 'Product Lead', avatar: 'https://picsum.photos/id/1012/200/200' },
-  { id: 'alex', name: 'Alex Wong', role: 'CTO', avatar: 'https://picsum.photos/id/1025/200/200' },
-  { id: 'sarah', name: 'Sarah Ye', role: 'Product Manager', avatar: 'https://picsum.photos/id/1011/200/200' },
+  { id: 'u1', name: 'Christina Lau', role: 'Product Lead', avatar: '' },
+  { id: 'alex', name: 'Alex Wong', role: 'CTO', avatar: '' },
+  { id: 'sarah', name: 'Sarah Ye', role: 'Product Manager', avatar: '' },
 ];
 
 // Mock Tasks Storage (in-memory for demo)

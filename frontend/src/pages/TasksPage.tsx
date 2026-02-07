@@ -17,14 +17,16 @@ import { useWorkspace } from '@/hooks/useWorkspace';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi } from '@/services/api/tasks';
 import { meetingsApi } from '@/services/api/meetings';
+import { promptTemplatesApi, type PromptTemplate } from '@/services/api/promptTemplates';
+import { workspaceTagsApi } from '@/services/api/workspaceTags';
 import { ProcessingTask } from '@/types';
 import toast from 'react-hot-toast';
 
-// Mock templates - TODO: Move to API
-const MOCK_TEMPLATES = [
-  { id: 't1', name: 'General', description: 'Standard meeting notes' },
-  { id: 't2', name: 'Product Review', description: 'Product-focused meetings' },
-  { id: 't3', name: 'Sales', description: 'Sales and customer meetings' },
+// Built-in SECTIONS templates
+const SECTIONS_TEMPLATES = [
+  { value: 'default', label: 'General – Standard meeting notes' },
+  { value: 'Product Review', label: 'Product Review – Product-focused meetings' },
+  { value: 'Sales', label: 'Sales – Sales and customer meetings' },
 ];
 
 export const TasksPage = () => {
@@ -33,9 +35,23 @@ export const TasksPage = () => {
   const queryClient = useQueryClient();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [reviewTitle, setReviewTitle] = useState('');
-  const [reviewTemplate, setReviewTemplate] = useState('t1');
+  const [reviewTemplate, setReviewTemplate] = useState('default');
   const [reviewTags, setReviewTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
+
+  const { data: promptTemplates = [] } = useQuery<PromptTemplate[]>({
+    queryKey: ['promptTemplates', activeWorkspace?.id],
+    queryFn: () =>
+      activeWorkspace ? promptTemplatesApi.list(activeWorkspace.id) : Promise.resolve([]),
+    enabled: !!activeWorkspace,
+  });
+
+  const { data: workspaceTags = [] } = useQuery({
+    queryKey: ['workspaceTags', activeWorkspace?.id],
+    queryFn: () =>
+      activeWorkspace ? workspaceTagsApi.list(activeWorkspace.id) : Promise.resolve([]),
+    enabled: !!activeWorkspace && !!selectedTaskId,
+  });
 
   const { data: tasks = [], isLoading, error } = useQuery<ProcessingTask[]>({
     queryKey: ['tasks', activeWorkspace?.id],
@@ -107,7 +123,7 @@ export const TasksPage = () => {
       });
       toast.success('Meeting created successfully!');
       setSelectedTaskId(null);
-      navigate(`/meetings/${meeting.id}`);
+      navigate(`/app/meetings/${meeting.id}`);
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to finalize task');
@@ -122,18 +138,21 @@ export const TasksPage = () => {
         (task.status === 'completed' && task.progress === 100) ||
         (task.status === 'processing' && task.progress === 100)) {
       setReviewTitle(task.filename.replace(/\.[^/.]+$/, '').replace(/_/g, ' '));
-      setReviewTags(['Internal', 'Project Alpha']);
+      setReviewTags([]);  // User selects from workspace tags or adds custom
+      // Use template from upload step (meeting.template)
+      setReviewTemplate(task.template || 'default');
     }
   };
 
   const handleSave = () => {
     if (selectedTaskId) {
-      const selectedTemplateName =
-        MOCK_TEMPLATES.find((t) => t.id === reviewTemplate)?.name || 'General';
+      // reviewTemplate is either SECTIONS value (default, Product Review, Sales) or prompt:<id>
+      const templateValue =
+        reviewTemplate === 'default' ? undefined : reviewTemplate;
       finalizeMutation.mutate({
         taskId: selectedTaskId,
         title: reviewTitle,
-        template: selectedTemplateName,
+        template: templateValue ?? 'default',
         tags: reviewTags,
       });
     }
@@ -410,11 +429,20 @@ export const TasksPage = () => {
                         onChange={(e) => setReviewTemplate(e.target.value)}
                         className="w-full px-4 py-3 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 bg-white text-slate-700 shadow-sm appearance-none"
                       >
-                        {MOCK_TEMPLATES.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.name} – {t.description}
+                        {SECTIONS_TEMPLATES.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
                           </option>
                         ))}
+                        {promptTemplates.length > 0 && (
+                          <optgroup label="自訂提示詞">
+                            {promptTemplates.map((t) => (
+                              <option key={t.id} value={`prompt:${t.id}`}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                         <ChevronRight size={16} className="rotate-90" />
@@ -443,10 +471,27 @@ export const TasksPage = () => {
                           </span>
                         ))}
                       </div>
+                      {workspaceTags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          <span className="text-xs text-slate-500 mr-1">Select:</span>
+                          {workspaceTags
+                            .filter((wt) => !reviewTags.includes(wt.name))
+                            .map((wt) => (
+                              <button
+                                key={wt.id}
+                                type="button"
+                                onClick={() => setReviewTags([...reviewTags, wt.name])}
+                                className="px-2 py-1 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors"
+                              >
+                                + {wt.name}
+                              </button>
+                            ))}
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder="Add tag..."
+                          placeholder="Or add custom tag..."
                           className="flex-1 px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:border-primary-500 bg-white"
                           value={newTag}
                           onChange={(e) => setNewTag(e.target.value)}

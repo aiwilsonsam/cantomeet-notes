@@ -7,6 +7,7 @@ import { meetingsApi } from '@/services/api/meetings';
 import { Meeting } from '@/types';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner';
+import { Avatar } from '@/components/shared/Avatar';
 import toast from 'react-hot-toast';
 
 export const MeetingsPage = () => {
@@ -257,12 +258,12 @@ export const MeetingsPage = () => {
                   <td className="px-6 py-4">
                     <div className="flex -space-x-2">
                       {(meeting.participants || []).slice(0, 4).map((p) => (
-                        <img
+                        <Avatar
                           key={p.id}
                           src={p.avatar}
-                          alt={p.name}
-                          title={p.name}
-                          className="w-8 h-8 rounded-full border-2 border-white ring-1 ring-slate-100"
+                          name={p.name || 'Participant'}
+                          size="md"
+                          className="border-2 border-white ring-1 ring-slate-100"
                         />
                       ))}
                       {(!meeting.participants || meeting.participants.length === 0) && (
