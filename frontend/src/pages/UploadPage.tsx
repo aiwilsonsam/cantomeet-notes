@@ -13,6 +13,17 @@ const SECTIONS_TEMPLATES = [
   { value: 'Sales', label: 'Sales – Sales and customer meetings' },
 ];
 
+// Must match backend ALLOWED_AUDIO_EXTENSIONS. Used for client-side validation
+// and for iOS where MIME type from Files/iCloud can be missing or wrong.
+const ALLOWED_AUDIO_EXTENSIONS = ['.m4a', '.mp3', '.wav', '.aac', '.flac', '.ogg'];
+
+function isAllowedAudioFile(file: File): boolean {
+  const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase();
+  const hasAllowedExt = ALLOWED_AUDIO_EXTENSIONS.includes(ext);
+  const hasAudioMime = file.type.startsWith('audio/');
+  return hasAllowedExt || hasAudioMime;
+}
+
 export const UploadPage = () => {
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
@@ -59,18 +70,22 @@ export const UploadPage = () => {
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const audioFiles = Array.from(e.dataTransfer.files).filter((file) =>
-        file.type.startsWith('audio/')
-      );
+      const audioFiles = Array.from(e.dataTransfer.files).filter(isAllowedAudioFile);
       setFiles((prev) => [...prev, ...audioFiles]);
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const audioFiles = Array.from(e.target.files).filter((file) => file.type.startsWith('audio/'));
+      const all = Array.from(e.target.files);
+      const audioFiles = all.filter(isAllowedAudioFile);
+      const rejected = all.length - audioFiles.length;
+      if (rejected > 0) {
+        toast.error(`Only audio files are supported (.m4a, .mp3, .wav, etc.). ${rejected} file(s) skipped.`);
+      }
       setFiles((prev) => [...prev, ...audioFiles]);
     }
+    e.target.value = '';
   };
 
   const removeFile = (index: number) => {
@@ -158,10 +173,13 @@ export const UploadPage = () => {
               </p>
               <label className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 cursor-pointer shadow-sm">
                 Choose Files
+                {/* iOS: accept="audio/*" causes WKFileUploadPanel to use limited UTI mappings, making
+                    .m4a in iCloud Drive / On My iPhone unselectable. Using empty accept shows the full
+                    document picker; we validate by extension (isAllowedAudioFile + backend). */}
                 <input
                   type="file"
                   className="hidden"
-                  accept="audio/*"
+                  accept=""
                   multiple
                   onChange={handleFileSelect}
                 />
